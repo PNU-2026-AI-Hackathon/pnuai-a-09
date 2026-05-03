@@ -1,6 +1,6 @@
 import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { FontFamily, mainBlue } from '@/constants/theme';
+import { FontFamily, primary } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 export type ThemedTextProps = TextProps & {
@@ -58,6 +58,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.pretendardRegular,
     lineHeight: 30,
     fontSize: 16,
-    color: mainBlue,
+    color: primary,
   },
 });
