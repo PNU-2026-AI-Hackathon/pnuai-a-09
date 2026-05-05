@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   },
   segmentLabel: {
     fontFamily: FontFamily.pretendardMedium,
-    fontSize: 14,
+    fontSize: 12,
     color: darkGray,
   },
   segmentLabelSelected: {
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   },
   groupTitle: {
     fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 16,
+    fontSize: 14,
     color: primary,
   },
 });

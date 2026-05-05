@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
+    shadowOpacity: 0.01,
     shadowRadius: 10,
     elevation: 2,
   },
@@ -157,13 +157,13 @@ const styles = StyleSheet.create({
   },
   username: {
     fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 14,
+    fontSize: 12,
     color: darkGray,
     flexShrink: 1,
   },
   createdAt: {
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 12,
+    fontSize: 10,
     color: gray,
     flexShrink: 1,
       marginLeft: 6
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   },
   contents: {
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 14,
+    fontSize: 12,
     lineHeight: 22,
     color: darkGray,
     marginBottom: 14,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   },
   actionCount: {
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 11,
+    fontSize: 10,
     color: darkGray,
   },
   comments: {
@@ -252,14 +252,14 @@ const styles = StyleSheet.create({
   },
   commentUsername: {
     fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 13,
+    fontSize: 12,
     color: darkGray,
     flexShrink: 0,
   },
   commentContent: {
     flex: 1,
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 13,
+    fontSize: 10,
     color: darkGray,
     minWidth: 0,
   },
