@@ -26,6 +26,17 @@ export default function TabLayout() {
         tabBarStyle: styles.tabBar,
       }}>
       <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color }) => (
+            <View style={styles.tabBarIconOffset}>
+              <NavigationTabIcon name="home" color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="write"
         options={{
           title: 'Write',
@@ -37,12 +48,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="index"
+        name="diary"
         options={{
-          title: 'Home',
+          title: 'Diary',
           tabBarIcon: ({ color }) => (
             <View style={styles.tabBarIconOffset}>
-              <NavigationTabIcon name="home" color={color} />
+              <NavigationTabIcon name="diary" color={color} />
             </View>
           ),
         }}
