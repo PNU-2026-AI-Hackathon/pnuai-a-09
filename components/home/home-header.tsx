@@ -3,7 +3,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
-import {background, darkGray, FontFamily, mainBlue, white} from '@/constants/theme';
+import {background, darkGray, FontFamily, primary, white} from '@/constants/theme';
 
 function Segment({
   label,
@@ -68,7 +68,7 @@ export function HomeHeader() {
       <Pressable style={styles.groupTitleRow} accessibilityRole="button">
         <SmallWhaleIcon size={22} />
         <Text style={styles.groupTitle}>정컴칭찬감옥방</Text>
-        <Ionicons name="chevron-down" size={18} color={mainBlue} />
+        <Ionicons name="chevron-down" size={18} color={primary} />
       </Pressable>
     </View>
   );
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   segmentPillSelected: {
-    backgroundColor: mainBlue,
+    backgroundColor: primary,
   },
   segmentLabel: {
     fontFamily: FontFamily.pretendardMedium,
@@ -131,6 +131,6 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 16,
-    color: mainBlue,
+    color: primary,
   },
 });
