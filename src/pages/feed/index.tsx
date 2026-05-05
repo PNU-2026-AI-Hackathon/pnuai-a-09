@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,13 +11,18 @@ import { PencilIcon } from '@/components/icons/pencil-icon';
 import { background, primary } from '@/constants/theme';
 
 const TAB_BAR_VISUAL_HEIGHT = 80;
+const FAB_SIZE = 52;
+/** 탭바 상단 기준 위로 띄울 간격 */
+const FAB_GAP_ABOVE_TAB = -80;
 
 export default function FeedPage() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const renderItem: ListRenderItem<FeedPost> = ({ item }) => <FeedPostCard post={item} />;
 
-  const bottomPad = TAB_BAR_VISUAL_HEIGHT + insets.bottom + 24;
+  const fabBottom = TAB_BAR_VISUAL_HEIGHT + insets.bottom + FAB_GAP_ABOVE_TAB;
+  const bottomPad = fabBottom + FAB_SIZE + 16;
 
   return (
     <View style={styles.screen}>
@@ -28,9 +34,10 @@ export default function FeedPage() {
         showsVerticalScrollIndicator={false}
       />
       <Pressable
-        style={[styles.fab, { bottom: TAB_BAR_VISUAL_HEIGHT + insets.bottom - 8 }]}
+        style={[styles.fab, { bottom: fabBottom }]}
         accessibilityRole="button"
-        accessibilityLabel="글 작성">
+        accessibilityLabel="글 작성"
+        onPress={() => router.push('/(tabs)/write')}>
         <PencilIcon size={22} />
       </Pressable>
     </View>
