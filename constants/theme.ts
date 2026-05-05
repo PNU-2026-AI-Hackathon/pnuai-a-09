@@ -5,7 +5,13 @@
 
 import { Platform } from 'react-native';
 
-export const mainBlue = '#69C5F1';
+export const primary = '#50D6F4';
+export const white = '#FFFFFF';
+export const background = '#F7F9FA';
+export const lightGray = '#EFEFEF';
+export const gray = '#B1B1B1';
+export const darkGray = '#3C4446';
+export const red = '#FF7676'
 export const tabIconInactive = '#B1B1B1';
 export const tabIconActive = '#3C4446';
 
@@ -21,8 +27,16 @@ export const FontFamily = {
   pretendardBlack: 'Pretendard-Black',
 } as const;
 
-const tintColorLight = mainBlue;
-const tintColorDark = mainBlue;
+const tintColorLight = primary;
+const tintColorDark = primary;
+
+export const FontSize = {
+  xs: 10,
+  base: 12,
+  lg: 14,
+} as const;
+
+
 
 export const Colors = {
   light: {
