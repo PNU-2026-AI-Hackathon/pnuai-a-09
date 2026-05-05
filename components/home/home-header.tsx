@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useSegments } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { FontFamily } from '@/constants/theme';
+import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
+import {background, darkGray, FontFamily, mainBlue, white} from '@/constants/theme';
 
 function Segment({
   label,
@@ -40,32 +41,34 @@ export function HomeHeader() {
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.topRow}>
-        <View style={styles.segmentRow}>
-          <Segment label="그룹" selected={active === 'group'} onPress={() => go('group')} />
-          <Segment label="피드" selected={active === 'feed'} onPress={() => go('feed')} />
-        </View>
+      <View style={styles.iconsRow}>
         <View style={styles.iconRow}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="알림"
             hitSlop={8}
             style={styles.iconHit}>
-            <Ionicons name="notifications-outline" size={22} color="#3C4446" />
+            <Ionicons name="notifications-outline" size={22} color={darkGray} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="설정"
             hitSlop={8}
             style={styles.iconHit}>
-            <Ionicons name="settings-outline" size={22} color="#3C4446" />
+            <Ionicons name="settings-outline" size={22} color={darkGray} />
           </Pressable>
         </View>
       </View>
+      <View style={styles.segmentSection}>
+        <View style={styles.segmentRow}>
+          <Segment label="그룹" selected={active === 'group'} onPress={() => go('group')} />
+          <Segment label="피드" selected={active === 'feed'} onPress={() => go('feed')} />
+        </View>
+      </View>
       <Pressable style={styles.groupTitleRow} accessibilityRole="button">
-        <Text style={styles.whale}>🐳</Text>
+        <SmallWhaleIcon size={22} />
         <Text style={styles.groupTitle}>정컴칭찬감옥방</Text>
-        <Ionicons name="chevron-down" size={18} color="#3C4446" />
+        <Ionicons name="chevron-down" size={18} color={mainBlue} />
       </Pressable>
     </View>
   );
@@ -77,19 +80,21 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
     gap: 12,
-    backgroundColor: '#fff',
+    backgroundColor: background,
   },
-  topRow: {
+  iconsRow: {
     flexDirection: 'row',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+  },
+  segmentSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   segmentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flexShrink: 1,
   },
   segmentPill: {
     paddingHorizontal: 18,
@@ -98,15 +103,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   segmentPillSelected: {
-    backgroundColor: '#50D6F4',
+    backgroundColor: mainBlue,
   },
   segmentLabel: {
     fontFamily: FontFamily.pretendardMedium,
     fontSize: 14,
-    color: '#B1B1B1',
+    color: darkGray,
   },
   segmentLabelSelected: {
-    color: '#FFFFFF',
+    color: white,
   },
   iconRow: {
     flexDirection: 'row',
@@ -121,13 +126,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     alignSelf: 'flex-start',
-  },
-  whale: {
-    fontSize: 18,
+      paddingTop: 8
   },
   groupTitle: {
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 16,
-    color: '#3C4446',
+    color: mainBlue,
   },
 });

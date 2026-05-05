@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { FeedPost } from '@/src/types/api/feed-post';
 
-import { FontFamily, gray, lightGray, red } from '@/constants/theme';
+import { darkGray, FontFamily, gray, lightGray, red } from '@/constants/theme';
 
 type Props = {
   post: FeedPost;
@@ -57,14 +57,25 @@ export function FeedPostCard({ post }: Props) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <ProfileAvatar uri={post.profile_image_url} size={40} />
-        <View style={styles.headerMeta}>
-          <Text style={styles.username}>{post.username}</Text>
-          <Text style={styles.createdAt}>{post.created_at}</Text>
+        <ProfileAvatar uri={post.profile_image_url} size={24} />
+        <View style={styles.headerMiddle}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.username} numberOfLines={1}>
+              {post.username}
+            </Text>
+            <Text style={styles.createdAt} numberOfLines={1}>
+              {post.created_at}
+            </Text>
+          </View>
+          <View style={styles.headerRight}>
+            <Text style={styles.relativeTime} numberOfLines={1}>
+              {post.relative_time}
+            </Text>
+            <Pressable hitSlop={10} accessibilityLabel="게시글 메뉴">
+              <Ionicons name="ellipsis-horizontal" size={20} color={gray} />
+            </Pressable>
+          </View>
         </View>
-        <Pressable hitSlop={10} accessibilityLabel="게시글 메뉴">
-          <Ionicons name="ellipsis-horizontal" size={20} color={gray} />
-        </Pressable>
       </View>
 
       <PostImageGrid urls={post.image_url} />
@@ -87,10 +98,12 @@ export function FeedPostCard({ post }: Props) {
           {post.comments.map((c) => (
             <View key={`${post.id}-${c.user_id}-${c.content.slice(0, 8)}`} style={styles.commentRow}>
               <ProfileAvatar uri={c.profile_image_url} size={28} />
-              <View style={styles.commentBody}>
-                <Text style={styles.commentUsername}>{c.username}</Text>
-                <Text style={styles.commentContent}>{c.content}</Text>
-              </View>
+              <Text style={styles.commentUsername} numberOfLines={1}>
+                {c.username}
+              </Text>
+              <Text style={styles.commentContent} numberOfLines={1} ellipsizeMode="tail">
+                {c.content}
+              </Text>
             </View>
           ))}
         </View>
@@ -102,14 +115,14 @@ export function FeedPostCard({ post }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 10,
+    padding: 20,
     marginHorizontal: 16,
     marginBottom: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    shadowOpacity: 0.02,
+    shadowRadius: 10,
     elevation: 2,
   },
   header: {
@@ -121,16 +134,41 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     backgroundColor: lightGray,
   },
-  headerMeta: {
+  headerMiddle: {
     flex: 1,
-    gap: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    minWidth: 0,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexShrink: 0,
   },
   username: {
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 14,
-    color: '#3C4446',
+    color: darkGray,
+    flexShrink: 1,
   },
   createdAt: {
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 12,
+    color: gray,
+    flexShrink: 1,
+      marginLeft: 6
+  },
+  relativeTime: {
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 12,
     color: gray,
@@ -180,9 +218,9 @@ const styles = StyleSheet.create({
   contents: {
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 14,
-    lineHeight: 21,
-    color: '#3C4446',
-    marginBottom: 12,
+    lineHeight: 22,
+    color: darkGray,
+    marginBottom: 14,
   },
   actions: {
     flexDirection: 'row',
@@ -196,9 +234,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionCount: {
-    fontFamily: FontFamily.pretendardMedium,
-    fontSize: 13,
-    color: '#3C4446',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 11,
+    color: darkGray,
   },
   comments: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -208,22 +246,21 @@ const styles = StyleSheet.create({
   },
   commentRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 8,
-  },
-  commentBody: {
-    flex: 1,
-    gap: 2,
+    minWidth: 0,
   },
   commentUsername: {
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 13,
-    color: '#3C4446',
+    color: darkGray,
+    flexShrink: 0,
   },
   commentContent: {
+    flex: 1,
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 13,
-    lineHeight: 19,
-    color: '#3C4446',
+    color: darkGray,
+    minWidth: 0,
   },
 });

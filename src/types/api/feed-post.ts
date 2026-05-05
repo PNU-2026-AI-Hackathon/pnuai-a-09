@@ -11,8 +11,10 @@ export type FeedPost = {
   id: string;
   profile_image_url: string | null;
   username: string;
-  /** 목업: `"2026.04.26 · 30분전"` 같은 표시 문자열. 추후 ISO8601로 바뀔 수 있음 */
+  /** 표시용 날짜 (예: 2026.04.26) — username 오른쪽 */
   created_at: string;
+  /** 상대 시간 (예: 30분전) — 메뉴 아이콘 바로 왼쪽 */
+  relative_time: string;
   image_url: string[];
   contents: string;
   like_count: number;

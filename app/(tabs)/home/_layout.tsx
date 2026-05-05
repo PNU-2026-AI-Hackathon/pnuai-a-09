@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Slot } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,13 +11,7 @@ export default function HomeLayout() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <HomeHeader />
       <View style={styles.stackWrap}>
-        <Stack
-          initialRouteName="index"
-          screenOptions={{
-            headerShown: false,
-            animation: 'none',
-          }}
-        />
+        <Slot />
       </View>
     </View>
   );

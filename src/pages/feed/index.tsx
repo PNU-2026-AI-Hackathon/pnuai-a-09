@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,6 +6,7 @@ import type { FeedPost } from '@/src/types/api/feed-post';
 
 import { FeedPostCard } from '@/src/pages/feed/post-card';
 
+import { PencilIcon } from '@/components/icons/pencil-icon';
 import { background, primary } from '@/constants/theme';
 
 const TAB_BAR_VISUAL_HEIGHT = 80;
@@ -31,7 +31,7 @@ export default function FeedPage() {
         style={[styles.fab, { bottom: TAB_BAR_VISUAL_HEIGHT + insets.bottom - 8 }]}
         accessibilityRole="button"
         accessibilityLabel="글 작성">
-        <Ionicons name="pencil" size={22} color="#fff" />
+        <PencilIcon size={22} />
       </Pressable>
     </View>
   );
