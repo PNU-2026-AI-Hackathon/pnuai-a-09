@@ -5,9 +5,6 @@
 
 import { Platform } from 'react-native';
 
-<<<<<<< HEAD
-export const primary = '#69C5F1';
-=======
 export const primary = '#50D6F4';
 export const white = '#FFFFFF';
 export const background = '#F7F9FA';
@@ -15,7 +12,6 @@ export const lightGray = '#EFEFEF';
 export const gray = '#B1B1B1';
 export const darkGray = '#3C4446';
 export const red = '#FF7676'
->>>>>>> 9fb75433f790f016fff5c055ec2e56b3efbc237f
 export const tabIconInactive = '#B1B1B1';
 export const tabIconActive = '#3C4446';
 
@@ -33,8 +29,6 @@ export const FontFamily = {
 
 const tintColorLight = primary;
 const tintColorDark = primary;
-<<<<<<< HEAD
-=======
 
 export const FontSize = {
   xs: 10,
@@ -43,7 +37,6 @@ export const FontSize = {
 } as const;
 
 
->>>>>>> 9fb75433f790f016fff5c055ec2e56b3efbc237f
 
 export const Colors = {
   light: {

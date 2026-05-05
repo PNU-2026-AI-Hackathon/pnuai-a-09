@@ -43,12 +43,12 @@ src/
 
 전역 색상은 `constants/theme.ts`에서 관리합니다.
 
-- 메인 컬러: `mainBlue` (`#69C5F1`)
+- 메인 컬러: `primary` (`#69C5F1`)
 - 탭 비활성 색상: `tabIconInactive` (`#B1B1B1`)
 - 탭 활성 색상: `tabIconActive` (`#3C4446`)
 
 ```tsx
-import { mainBlue } from '@/constants/theme';
+import { primary } from '@/constants/theme';
 ```
 
 색상을 직접 하드코딩하지 말고 `constants/theme.ts`에 추가해서 사용합니다.
