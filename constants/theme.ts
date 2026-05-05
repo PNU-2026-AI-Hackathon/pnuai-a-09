@@ -6,7 +6,6 @@
 import { Platform } from 'react-native';
 
 export const primary = '#50D6F4';
-export const mainBlue = primary;
 export const white = '#FFFFFF';
 export const background = '#F7F9FA';
 export const lightGray = '#EFEFEF';
