@@ -16,7 +16,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
+  const [loaded, fontError] = useFonts({
     'Pretendard-Thin': require('../assets/fonts/Pretendard-Thin.ttf'),
     'Pretendard-ExtraLight': require('../assets/fonts/Pretendard-ExtraLight.ttf'),
     'Pretendard-Light': require('../assets/fonts/Pretendard-Light.ttf'),
@@ -29,12 +29,15 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded || fontError) {
+      if (fontError) {
+        console.warn('[fonts]', fontError);
+      }
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [loaded, fontError]);
 
-  if (!loaded) {
+  if (!loaded && !fontError) {
     return null;
   }
 
