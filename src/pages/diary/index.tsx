@@ -1,20 +1,460 @@
-import { StyleSheet } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import {
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { background, darkGray, FontFamily, FontSize, gray, lightGray, primary, white } from '@/constants/theme';
+import { mockDiaryCategories, mockDiaryEntries } from '@/src/mocks/posts';
+
+const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const MONTH_LABELS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+type CalendarDay = number | null;
+
+function getCalendarWeeks(year: number, month: number) {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const days: CalendarDay[] = [
+    ...Array.from({ length: firstDay }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
+  ];
+
+  while (days.length % 7 !== 0) {
+    days.push(null);
+  }
+
+  return Array.from({ length: days.length / 7 }, (_, index) => days.slice(index * 7, index * 7 + 7));
+}
+
+function CalendarIcon() {
+  return (
+    <Svg width={16} height={17} viewBox="0 0 16 17" fill="none">
+      <Path
+        d="M11.75 0.5V4.05556M4.25 0.5V4.05556M0.5 7.61111H15.5M2.375 2.27778H13.625C14.6605 2.27778 15.5 3.07372 15.5 4.05556V14.7222C15.5 15.7041 14.6605 16.5 13.625 16.5H2.375C1.33947 16.5 0.5 15.7041 0.5 14.7222V4.05556C0.5 3.07372 1.33947 2.27778 2.375 2.27778Z"
+        stroke={gray}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <Svg width={72} height={40} viewBox="0 0 72 40" fill="none">
+      <Path
+        d="M0 3.52564C0 1.57849 1.57848 0 3.52564 0H29.154C29.9797 0 30.7793 0.289836 31.4132 0.818969L37.4866 5.88832C38.1205 6.41745 38.92 6.70729 39.7458 6.70729H68.4744C70.4215 6.70729 72 8.28577 72 10.2329V36.4744C72 38.4215 70.4215 40 68.4744 40H3.52564C1.57848 40 0 38.4215 0 36.4744L0 3.52564Z"
+        fill="url(#folderGradient)"
+        opacity={0.86}
+      />
+      <Defs>
+        <LinearGradient id="folderGradient" x1="36" y1="0" x2="36" y2="31.2727" gradientUnits="userSpaceOnUse">
+          <Stop stopColor="#B1E5FF" stopOpacity={1} />
+          <Stop offset="1" stopColor="#B1E6FF" />
+        </LinearGradient>
+      </Defs>
+    </Svg>
+  );
+}
 
 export default function DiaryPage() {
+  const now = new Date();
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [failedDiaryImages, setFailedDiaryImages] = useState<Record<number, boolean>>({});
+  const [failedCategoryImages, setFailedCategoryImages] = useState<Record<string, boolean>>({});
+
+  const weeks = useMemo(() => getCalendarWeeks(selectedYear, selectedMonth), [selectedMonth, selectedYear]);
+  const entriesByDay = useMemo(() => new Map(mockDiaryEntries.map((entry) => [entry.day, entry])), []);
+
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title">다이어리 페이지</ThemedText>
-    </ThemedView>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.calendarHeader}>
+          <Text style={styles.yearText}>{selectedYear}</Text>
+          <View style={styles.monthRow}>
+            <Text style={styles.monthText}>{MONTH_LABELS[selectedMonth]}</Text>
+            <Pressable
+              style={styles.calendarButton}
+              accessibilityRole="button"
+              accessibilityLabel="월 선택"
+              onPress={() => setIsMonthPickerOpen(true)}>
+              <CalendarIcon />
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.weekRow}>
+          {WEEK_DAYS.map((day) => (
+            <Text key={day} style={styles.weekText}>
+              {day}
+            </Text>
+          ))}
+        </View>
+
+        <View style={styles.calendarGrid}>
+          {weeks.map((week, weekIndex) => (
+            <View key={`week-${weekIndex}`} style={styles.calendarWeek}>
+              {week.map((day, dayIndex) => {
+                const entry = day ? entriesByDay.get(day) : undefined;
+                const hasFailedDiaryImage = day ? failedDiaryImages[day] : false;
+                const photoSource = entry?.hasPhoto && entry.image && !hasFailedDiaryImage ? entry.image : undefined;
+
+                return (
+                  <View key={`${day ?? 'empty'}-${weekIndex}-${dayIndex}`} style={styles.dayCell}>
+                    {day ? (
+                      <View
+                        style={[
+                          styles.dayContent,
+                          entry && !entry.hasPhoto ? styles.textDiaryCell : undefined,
+                          entry?.hasPhoto && !photoSource ? styles.photoFallbackCell : undefined,
+                        ]}>
+                        {photoSource ? (
+                          <Image
+                            source={photoSource}
+                            style={styles.dayImage}
+                            blurRadius={8}
+                            resizeMode="cover"
+                            onError={() => setFailedDiaryImages((prev) => ({ ...prev, [day]: true }))}
+                          />
+                        ) : null}
+                        <Text style={[styles.dayText, entry ? styles.activeDayText : undefined]}>{day}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
+              </View>
+          ))}
+        </View>
+
+        <View style={styles.categorySection}>
+          <Text style={styles.categoryTitle}>Category</Text>
+          <ScrollView
+            horizontal
+            contentContainerStyle={styles.categoryList}
+            showsHorizontalScrollIndicator={false}>
+            {mockDiaryCategories.map((category) => {
+              const showImage = category.image && !failedCategoryImages[category.id];
+
+              return (
+                <View key={category.id} style={styles.categoryItem}>
+                  <View style={styles.folderStack}>
+                    <View style={styles.folderBack} />
+                    {showImage ? (
+                      <Image
+                        source={category.image}
+                        style={styles.folderImage}
+                        resizeMode="cover"
+                        onError={() => setFailedCategoryImages((prev) => ({ ...prev, [category.id]: true }))}
+                      />
+                    ) : (
+                      <View style={[styles.folderImage, styles.categoryImageFallback]} />
+                    )}
+                    <View style={styles.folderOverlay}>
+                      <FolderIcon />
+                    </View>
+                  </View>
+                  <Text style={styles.categoryName} numberOfLines={1}>
+                    {category.title}
+                  </Text>
+                  <Text style={styles.postCount}>{category.postCount} posts</Text>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </ScrollView>
+
+      <Modal
+        visible={isMonthPickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMonthPickerOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setIsMonthPickerOpen(false)}>
+          <Pressable style={styles.monthPickerCard}>
+            <View style={styles.monthPickerHeader}>
+              <Pressable
+                style={styles.yearButton}
+                accessibilityRole="button"
+                accessibilityLabel="이전 연도"
+                onPress={() => setSelectedYear((prev) => prev - 1)}>
+                <Text style={styles.yearButtonText}>‹</Text>
+              </Pressable>
+              <Text style={styles.monthPickerYear}>{selectedYear}</Text>
+              <Pressable
+                style={styles.yearButton}
+                accessibilityRole="button"
+                accessibilityLabel="다음 연도"
+                onPress={() => setSelectedYear((prev) => prev + 1)}>
+                <Text style={styles.yearButtonText}>›</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.monthPickerGrid}>
+              {MONTH_LABELS.map((month, index) => (
+                <Pressable
+                  key={month}
+                  style={[styles.monthOption, index === selectedMonth ? styles.selectedMonthOption : undefined]}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setSelectedMonth(index);
+                    setIsMonthPickerOpen(false);
+                  }}>
+                  <Text style={[styles.monthOptionText, index === selectedMonth ? styles.selectedMonthOptionText : undefined]}>
+                    {month}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
+    backgroundColor: background,
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: background,
+  },
+  content: {
+    paddingBottom: 96,
+  },
+  calendarHeader: {
+    alignItems: 'center',
+    paddingTop: 78,
+    paddingBottom: 22,
+  },
+  yearText: {
+    color: gray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 10,
+    lineHeight: 12,
+  },
+  monthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  monthText: {
+    color: '#000000',
+    fontFamily: FontFamily.pretendardBold,
+    fontSize: 20,
+    lineHeight: 24,
+    marginLeft: 36
+  },
+  calendarButton: {
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  weekRow: {
+    flexDirection: 'row',
+  },
+  weekText: {
+    width: `${100 / 7}%`,
+    color: gray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 9,
+    lineHeight: 12,
+    textAlign: 'center',
+    paddingVertical: 4,
+    backgroundColor: white,
+  },
+  calendarGrid: {
+    backgroundColor: white,
+  },
+  calendarWeek: {
+    flexDirection: 'row',
+  },
+  dayCell: {
+    flex: 1,
+    aspectRatio: 1,
+  },
+  dayContent: {
+    flex: 1,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: '#EDF1F3',
+    borderRadius: 12,
+    backgroundColor: white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textDiaryCell: {
+    borderWidth: 0,
+    backgroundColor: primary,
+  },
+  photoFallbackCell: {
+    borderWidth: 0,
+    backgroundColor: '#B1B1B1',
+  },
+  dayImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+    opacity: 1,
+  },
+  dayText: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: FontSize.base,
+    lineHeight: 14,
+  },
+  activeDayText: {
+    color: white,
+  },
+  categorySection: {
+    marginTop: 30,
+    paddingTop: 24,
+    paddingBottom: 30,
+    backgroundColor: background,
+  },
+  categoryTitle: {
+    marginLeft: 22,
+    color: darkGray,
+    fontFamily: FontFamily.pretendardBold,
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  categoryList: {
+    gap: 32,
+    paddingHorizontal: 22,
+    paddingTop: 26,
+  },
+  categoryItem: {
+    width: 72,
+    alignItems: 'center',
+  },
+  folderStack: {
+    width: 72,
+    height: 58,
+  },
+  folderBack: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    width: 72,
+    height: 52,
+    borderRadius: 4,
+    backgroundColor: '#B1E6FF',
+  },
+  folderImage: {
+    position: 'absolute',
+    top: 0,
+    left: 12,
+    width: 55,
+    height: 52,
+    borderRadius: 5,
+  },
+  categoryImageFallback: {
+    backgroundColor: '#B1B1B1',
+  },
+  folderOverlay: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+  },
+  categoryName: {
+    width: 86,
+    marginTop: 10,
+    color: '#111111',
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 12,
+    textAlign: 'center',
+  },
+  postCount: {
+    marginTop: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 2,
+    backgroundColor: lightGray,
+    color: gray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 8,
+    lineHeight: 10,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  monthPickerCard: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: 20,
+    backgroundColor: white,
+    padding: 20,
+  },
+  monthPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  yearButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  yearButtonText: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardBold,
+    fontSize: 24,
+    lineHeight: 28,
+  },
+  monthPickerYear: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardBold,
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  monthPickerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  monthOption: {
+    width: '30.8%',
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedMonthOption: {
+    backgroundColor: primary,
+  },
+  monthOptionText: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  selectedMonthOptionText: {
+    color: white,
   },
 });

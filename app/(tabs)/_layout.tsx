@@ -78,6 +78,7 @@ const styles = StyleSheet.create({
     height: 80,
     paddingTop: 0,
     paddingBottom: 0,
+    paddingHorizontal: 22
   },
   tabBarIcon: {
     flex: 0,
