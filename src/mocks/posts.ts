@@ -1,4 +1,21 @@
+import type { ImageSourcePropType } from 'react-native';
+
 import type { FeedPost } from '@/src/types/api/feed-post';
+
+const diarySampleImage = require('../../assets/icons/test.png') as ImageSourcePropType;
+
+export type DiaryMockEntry = {
+  day: number;
+  hasPhoto?: boolean;
+  image?: ImageSourcePropType;
+};
+
+export type DiaryMockCategory = {
+  id: string;
+  title: string;
+  postCount: number;
+  image?: ImageSourcePropType;
+};
 
 export const mockPosts: FeedPost[] = [
   {
@@ -44,4 +61,27 @@ export const mockPosts: FeedPost[] = [
       },
     ],
   },
+];
+
+export const mockDiaryEntries: DiaryMockEntry[] = [
+  { day: 1, hasPhoto: false },
+  { day: 5, hasPhoto: true, image: diarySampleImage },
+  { day: 7, hasPhoto: true, image: diarySampleImage },
+  { day: 13, hasPhoto: false },
+  { day: 14, hasPhoto: true, image: diarySampleImage },
+  { day: 15, hasPhoto: true, image: diarySampleImage },
+  { day: 18, hasPhoto: false },
+  { day: 21, hasPhoto: true, image: diarySampleImage },
+  { day: 24, hasPhoto: true, image: diarySampleImage },
+  { day: 25, hasPhoto: true, image: diarySampleImage },
+  { day: 29, hasPhoto: false },
+  { day: 30, hasPhoto: true, image: diarySampleImage },
+];
+
+export const mockDiaryCategories: DiaryMockCategory[] = [
+  { id: 'all', title: '전체', postCount: 12, image: diarySampleImage },
+  { id: 'life', title: '사회생활', postCount: 28, image: diarySampleImage },
+  { id: 'friends', title: '친구', postCount: 28, image: diarySampleImage },
+  { id: 'family', title: '가족', postCount: 8, image: diarySampleImage },
+  { id: 'travel', title: '여행', postCount: 16, image: diarySampleImage },
 ];
