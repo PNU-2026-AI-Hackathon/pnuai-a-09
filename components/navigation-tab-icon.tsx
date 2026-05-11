@@ -8,7 +8,7 @@ type NavigationTabIconProps = {
   size?: number;
 };
 
-export function NavigationTabIcon({ name, color, size = 30 }: NavigationTabIconProps) {
+export function NavigationTabIcon({ name, color, size = 24 }: NavigationTabIconProps) {
   if (name === 'write') {
     return (
       <Svg width={size} height={size} viewBox="0 0 30 30" fill="none">
