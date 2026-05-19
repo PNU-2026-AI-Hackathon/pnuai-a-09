@@ -1,10 +1,14 @@
+import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
-import { background, FontFamily, primary, white } from '@/constants/theme';
+import { background, darkGray, FontFamily, primary, white } from '@/constants/theme';
+import { mockGroupFriends } from '@/src/mocks/group';
 
 const whaleBackground = require('../../../assets/video/whale_background.mp4');
+const whaleCharacter = require('../../../assets/icons/whale1.png');
+const whaleGradation = require('../../../assets/icons/gradation.png');
 const noop = () => undefined;
 
 function PlusIcon() {
@@ -54,6 +58,17 @@ export default function GroupPage() {
         nativeControls={false}
       />
       <VideoLightOverlay />
+      <View style={styles.memberList}>
+        {mockGroupFriends.map((friend) => (
+          <View key={friend.name} style={styles.memberItem}>
+            <View style={styles.characterStack}>
+              <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
+              <Image source={whaleCharacter} style={styles.characterImage} contentFit="contain" />
+            </View>
+            <Text style={styles.characterName}>{friend.name}</Text>
+          </View>
+        ))}
+      </View>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="친구초대"
@@ -90,6 +105,44 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 360,
+  },
+  memberList: {
+    position: 'absolute',
+    top: 174,
+    left: 18,
+    right: 18,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
+  },
+  memberItem: {
+    width: 123,
+    alignItems: 'center',
+  },
+  characterStack: {
+    width: 123,
+    height: 96,
+  },
+  characterGradation: {
+    position: 'absolute',
+    right: -16,
+    bottom: -4,
+    width: 123,
+    height: 100,
+  },
+  characterImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 123,
+    height: 96,
+  },
+  characterName: {
+    marginTop: 8,
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 14,
+    lineHeight: 18,
   },
   inviteButton: {
     position: 'absolute',
