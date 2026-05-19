@@ -34,6 +34,15 @@ export const mockPosts: FeedPost[] = [
         profile_image_url: null,
         username: '혜민',
         content: '완저니 갓생이다><',
+        replies: [
+          {
+            user_id: 'user-sohee',
+            profile_image_url: null,
+            username: '소희._.',
+            content: '완저니 갓생이다><',
+            is_author: true,
+          },
+        ],
       },
       {
         user_id: 'user-sohee',

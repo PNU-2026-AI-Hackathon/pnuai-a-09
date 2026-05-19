@@ -4,6 +4,8 @@ export type FeedComment = {
   profile_image_url: string | null;
   username: string;
   content: string;
+  is_author?: boolean;
+  replies?: FeedComment[];
 };
 
 /** 피드 게시글 */
