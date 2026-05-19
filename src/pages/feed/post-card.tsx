@@ -1,10 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Modal,
+  PanResponder,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
-import type { FeedPost } from '@/src/types/api/feed-post';
+import type { FeedComment, FeedPost } from '@/src/types/api/feed-post';
 
-import { darkGray, FontFamily, gray, lightGray, red } from '@/constants/theme';
+import { darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
 
 type Props = {
   post: FeedPost;
@@ -53,7 +67,129 @@ function PostImageGrid({ urls }: { urls: string[] }) {
   );
 }
 
+function getCommentCount(comments: FeedComment[]) {
+  return comments.reduce((count, comment) => count + 1 + (comment.replies?.length ?? 0), 0);
+}
+
+function CommentItem({ comment, isReply = false }: { comment: FeedComment; isReply?: boolean }) {
+  return (
+    <View style={[styles.sheetCommentRow, isReply && styles.sheetReplyRow]}>
+      <ProfileAvatar uri={comment.profile_image_url} size={isReply ? 40 : 42} />
+      <View style={styles.sheetCommentBody}>
+        <View style={styles.sheetNameRow}>
+          <Text style={styles.sheetUsername}>{comment.username}</Text>
+          {comment.is_author ? <Text style={styles.authorBadge}>작성자</Text> : null}
+        </View>
+        <Text style={styles.sheetCommentText}>{comment.content}</Text>
+        <Pressable accessibilityRole="button" hitSlop={8}>
+          <Text style={styles.replyText}>Reply</Text>
+        </Pressable>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="댓글 좋아요" hitSlop={10} style={styles.commentLikeButton}>
+        <Ionicons name={comment.is_author ? 'heart' : 'heart-outline'} size={20} color={comment.is_author ? red : gray} />
+      </Pressable>
+    </View>
+  );
+}
+
 export function FeedPostCard({ post }: Props) {
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [isCommentsMounted, setIsCommentsMounted] = useState(false);
+  const [draftComment, setDraftComment] = useState('');
+  const [localComments, setLocalComments] = useState<FeedComment[]>(post.comments);
+  const sheetProgress = useRef(new Animated.Value(0)).current;
+  const dragY = useRef(new Animated.Value(0)).current;
+  const commentCount = useMemo(() => getCommentCount(localComments), [localComments]);
+  const closeComments = useCallback(() => setIsCommentsOpen(false), []);
+
+  const sheetPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 4,
+        onPanResponderMove: (_, gestureState) => {
+          dragY.setValue(Math.max(0, gestureState.dy));
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dy > 110 || gestureState.vy > 0.85) {
+            closeComments();
+            return;
+          }
+
+          Animated.spring(dragY, {
+            toValue: 0,
+            speed: 22,
+            bounciness: 0,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(dragY, {
+            toValue: 0,
+            speed: 22,
+            bounciness: 0,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [closeComments, dragY],
+  );
+
+  useEffect(() => {
+    if (isCommentsOpen) {
+      setIsCommentsMounted(true);
+      sheetProgress.setValue(0);
+      dragY.setValue(0);
+      requestAnimationFrame(() => {
+        Animated.timing(sheetProgress, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      });
+      return;
+    }
+
+    Animated.timing(sheetProgress, {
+      toValue: 0,
+      duration: 220,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) {
+        setIsCommentsMounted(false);
+        dragY.setValue(0);
+      }
+    });
+  }, [dragY, isCommentsOpen, sheetProgress]);
+
+  const sheetTranslateY = sheetProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [720, 0],
+  });
+  const backdropOpacity = sheetProgress.interpolate({
+    inputRange: [0, 0.82, 1],
+    outputRange: [0, 0, 0.45],
+  });
+  const draggedSheetTranslateY = Animated.add(sheetTranslateY, dragY);
+
+  const submitComment = () => {
+    const content = draftComment.trim();
+    if (!content) return;
+
+    setLocalComments((prev) => [
+      ...prev,
+      {
+        user_id: `local-${Date.now()}`,
+        profile_image_url: null,
+        username: '나',
+        content,
+      },
+    ]);
+    setDraftComment('');
+  };
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -87,15 +223,20 @@ export function FeedPostCard({ post }: Props) {
           <Ionicons name="heart" size={20} color={red} />
           <Text style={styles.actionCount}>{post.like_count}</Text>
         </View>
-        <View style={styles.actionItem}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="댓글 보기"
+          hitSlop={8}
+          onPress={() => setIsCommentsOpen(true)}
+          style={styles.actionItem}>
           <Ionicons name="chatbubble-outline" size={18} color={gray} />
-          <Text style={styles.actionCount}>{post.comments.length}</Text>
-        </View>
+          <Text style={styles.actionCount}>{commentCount}</Text>
+        </Pressable>
       </View>
 
-      {post.comments.length > 0 ? (
-        <View style={styles.comments}>
-          {post.comments.map((c) => (
+      {localComments.length > 0 ? (
+        <Pressable accessibilityRole="button" onPress={() => setIsCommentsOpen(true)} style={styles.comments}>
+          {localComments.map((c) => (
             <View key={`${post.id}-${c.user_id}-${c.content.slice(0, 8)}`} style={styles.commentRow}>
               <ProfileAvatar uri={c.profile_image_url} size={28} />
               <Text style={styles.commentUsername} numberOfLines={1}>
@@ -106,8 +247,78 @@ export function FeedPostCard({ post }: Props) {
               </Text>
             </View>
           ))}
-        </View>
+        </Pressable>
       ) : null}
+
+      <Modal
+        visible={isCommentsMounted}
+        transparent
+        animationType="none"
+        onRequestClose={closeComments}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.sheetOverlay}>
+          <Animated.View style={[styles.sheetBackdrop, { opacity: backdropOpacity }]}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={closeComments} />
+          </Animated.View>
+          <Animated.View style={[styles.commentSheet, { transform: [{ translateY: draggedSheetTranslateY }] }]}>
+            <View style={styles.sheetDragHandle} {...sheetPanResponder.panHandlers}>
+              <View style={styles.sheetHandle} />
+            </View>
+            <View style={styles.sheetHeader}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="댓글 닫기"
+                hitSlop={10}
+                onPress={closeComments}
+                style={styles.sheetBackButton}>
+                <Ionicons name="arrow-back" size={24} color={darkGray} />
+              </Pressable>
+              <Text style={styles.sheetTitle}>댓글</Text>
+              <View style={styles.sheetHeaderSpacer} />
+            </View>
+
+            <ScrollView
+              style={styles.sheetList}
+              contentContainerStyle={styles.sheetListContent}
+              showsVerticalScrollIndicator={false}>
+              {localComments.map((comment) => (
+                <View key={`sheet-${post.id}-${comment.user_id}-${comment.content.slice(0, 8)}`}>
+                  <CommentItem comment={comment} />
+                  {comment.replies?.map((reply) => (
+                    <CommentItem
+                      key={`reply-${post.id}-${comment.user_id}-${reply.user_id}-${reply.content.slice(0, 8)}`}
+                      comment={reply}
+                      isReply
+                    />
+                  ))}
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.commentInputBar}>
+              <View style={styles.commentInputPill}>
+                <TextInput
+                  value={draftComment}
+                  onChangeText={setDraftComment}
+                  placeholder="댓글 남기기"
+                  placeholderTextColor="#B1B1B1"
+                  style={styles.commentInput}
+                  returnKeyType="send"
+                  onSubmitEditing={submitComment}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="댓글 등록"
+                  onPress={submitComment}
+                  style={[styles.sendButton, draftComment.trim().length > 0 && styles.sendButtonActive]}>
+                  <Ionicons name="arrow-up" size={21} color={white} />
+                </Pressable>
+              </View>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -257,5 +468,158 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: darkGray,
     minWidth: 0,
+  },
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+  },
+  commentSheet: {
+    height: '82%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    backgroundColor: white,
+    overflow: 'hidden',
+  },
+  sheetDragHandle: {
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 38,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E8E8E8',
+  },
+  sheetHeader: {
+    height: 58,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  sheetBackButton: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetTitle: {
+    color: '#111111',
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  sheetHeaderSpacer: {
+    width: 32,
+  },
+  sheetList: {
+    flex: 1,
+  },
+  sheetListContent: {
+    paddingTop: 18,
+    paddingHorizontal: 24,
+    paddingBottom: 28,
+    gap: 24,
+  },
+  sheetCommentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    minHeight: 78,
+  },
+  sheetReplyRow: {
+    marginLeft: 52,
+    marginTop: 2,
+  },
+  sheetCommentBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  sheetNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sheetUsername: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  authorBadge: {
+    overflow: 'hidden',
+    borderRadius: 2,
+    backgroundColor: lightGray,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    color: '#777777',
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 10,
+    lineHeight: 12,
+  },
+  sheetCommentText: {
+    marginTop: 8,
+    color: darkGray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  replyText: {
+    marginTop: 10,
+    color: gray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  commentLikeButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 18,
+  },
+  commentInputBar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#EFEFEF',
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 14,
+    backgroundColor: white,
+  },
+  commentInputPill: {
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EFEFEF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 20,
+    paddingRight: 3,
+    marginBottom: 15
+  },
+  commentInput: {
+    flex: 1,
+    height: 38,
+    paddingVertical: 0,
+    color: darkGray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+  },
+  sendButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 16,
+    backgroundColor: '#777777',
+    alignItems: 'center',
+    justifyContent: 'center',
+    right: 2
+  },
+  sendButtonActive: {
+    backgroundColor: primary,
   },
 });

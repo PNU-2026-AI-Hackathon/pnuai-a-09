@@ -53,11 +53,10 @@ function FolderIcon() {
       <Path
         d="M0 3.52564C0 1.57849 1.57848 0 3.52564 0H29.154C29.9797 0 30.7793 0.289836 31.4132 0.818969L37.4866 5.88832C38.1205 6.41745 38.92 6.70729 39.7458 6.70729H68.4744C70.4215 6.70729 72 8.28577 72 10.2329V36.4744C72 38.4215 70.4215 40 68.4744 40H3.52564C1.57848 40 0 38.4215 0 36.4744L0 3.52564Z"
         fill="url(#folderGradient)"
-        opacity={0.86}
       />
       <Defs>
         <LinearGradient id="folderGradient" x1="36" y1="0" x2="36" y2="31.2727" gradientUnits="userSpaceOnUse">
-          <Stop stopColor="#B1E5FF" stopOpacity={1} />
+          <Stop stopColor="#B1E6FF" stopOpacity={0.6} />
           <Stop offset="1" stopColor="#B1E6FF" />
         </LinearGradient>
       </Defs>
@@ -247,18 +246,21 @@ const styles = StyleSheet.create({
     lineHeight: 12,
   },
   monthRow: {
-    flexDirection: 'row',
+    width: '100%',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
+    position: 'relative',
   },
   monthText: {
     color: '#000000',
     fontFamily: FontFamily.pretendardBold,
     fontSize: 20,
     lineHeight: 24,
-    marginLeft: 36
   },
   calendarButton: {
+    position: 'absolute',
+    left: '50%',
+    marginLeft: 28,
     width: 28,
     height: 28,
     alignItems: 'center',
@@ -371,6 +373,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     bottom: 0,
+    borderRadius: 3.53,
+    shadowColor: '#557788',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   categoryName: {
     width: 86,
