@@ -1,9 +1,11 @@
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { background, darkGray, FontFamily, primary, white } from '@/constants/theme';
+import type { GroupFriend } from '@/src/mocks/group';
 import { mockGroupFriends } from '@/src/mocks/group';
 
 const whaleBackground = require('../../../assets/video/whale_background.mp4');
@@ -15,6 +17,14 @@ function PlusIcon() {
   return (
     <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
       <Path d="M5.75 0.75L5.75 10.75M10.75 5.75L0.75 5.75" stroke={primary} strokeWidth={1.5} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+      <Path d="M5 5L19 19M19 5L5 19" stroke={darkGray} strokeWidth={1.5} strokeLinecap="round" />
     </Svg>
   );
 }
@@ -43,6 +53,7 @@ function VideoLightOverlay() {
 }
 
 export default function GroupPage() {
+  const [selectedFriend, setSelectedFriend] = useState<GroupFriend | null>(null);
   const player = useVideoPlayer(whaleBackground, (videoPlayer) => {
     videoPlayer.loop = true;
     videoPlayer.muted = true;
@@ -60,15 +71,74 @@ export default function GroupPage() {
       <VideoLightOverlay />
       <View style={styles.memberList}>
         {mockGroupFriends.map((friend) => (
-          <View key={friend.name} style={styles.memberItem}>
+          <Pressable
+            key={friend.name}
+            accessibilityRole="button"
+            accessibilityLabel={`${friend.name} 프로필 보기`}
+            onPress={() => setSelectedFriend(friend)}
+            style={({ pressed }) => [styles.memberItem, pressed && styles.memberItemPressed]}>
             <View style={styles.characterStack}>
               <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
               <Image source={whaleCharacter} style={styles.characterImage} contentFit="contain" />
             </View>
             <Text style={styles.characterName}>{friend.name}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
+      <Modal
+        visible={selectedFriend !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedFriend(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.profileCard}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="프로필 닫기"
+              onPress={() => setSelectedFriend(null)}
+              hitSlop={8}
+              style={styles.closeButton}>
+              <CloseIcon />
+            </Pressable>
+            {selectedFriend ? (
+              <View style={styles.profileContent}>
+                <View style={styles.profileLeft}>
+                  <View style={styles.profileImageStack}>
+                    <Image source={whaleGradation} style={styles.profileGradation} contentFit="contain" />
+                    <Image source={whaleCharacter} style={styles.profileImage} contentFit="contain" />
+                  </View>
+                  <Pressable accessibilityRole="button" onPress={noop} style={styles.visitButton}>
+                    <Text style={styles.visitButtonText}>방문하기</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.profileRight}>
+                  <Text style={styles.profileName} numberOfLines={1}>
+                    {selectedFriend.name}
+                  </Text>
+                  <Text style={styles.profileDescription} numberOfLines={3}>
+                    {selectedFriend.description}
+                  </Text>
+                  <View style={styles.statRow}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{selectedFriend.friends_count}</Text>
+                      <Text style={styles.statLabel}>Friends</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{selectedFriend.like_count}</Text>
+                      <Text style={styles.statLabel}>Like</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{selectedFriend.post_count}</Text>
+                      <Text style={styles.statLabel}>Post</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="친구초대"
@@ -118,6 +188,9 @@ const styles = StyleSheet.create({
   memberItem: {
     width: 123,
     alignItems: 'center',
+  },
+  memberItemPressed: {
+    opacity: 0.78,
   },
   characterStack: {
     width: 123,
@@ -169,5 +242,114 @@ const styles = StyleSheet.create({
     backgroundColor: white,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.20)',
+  },
+  profileCard: {
+    width: '100%',
+    maxWidth: 379,
+    minHeight: 245,
+    borderRadius: 8,
+    backgroundColor: white,
+    paddingTop: 42,
+    paddingRight: 20,
+    paddingBottom: 20,
+    paddingLeft: 15,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 20,
+    right: 15,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileContent: {
+    flexDirection: 'row',
+    gap: 18,
+  },
+  profileLeft: {
+    width: 116,
+    alignItems: 'center',
+    paddingTop: 12,
+  },
+  profileImageStack: {
+    width: 116,
+    height: 92,
+  },
+  profileGradation: {
+    position: 'absolute',
+    right: -12,
+    bottom: -5,
+    width: 116,
+    height: 96,
+  },
+  profileImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 110,
+    height: 97,
+  },
+  visitButton: {
+    marginTop: 18,
+    width: 68,
+    height: 30,
+    borderRadius: 4,
+    backgroundColor: primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  visitButtonText: {
+    color: white,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 15,
+  },
+  profileRight: {
+    flex: 1,
+    paddingTop: 18,
+  },
+  profileName: {
+    color: '#000000',
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  profileDescription: {
+    marginTop: 14,
+    color: '#777777',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 18,
+    paddingRight: 6,
+  },
+  statItem: {
+    minWidth: 42,
+    alignItems: 'center',
+  },
+  statValue: {
+    color: '#3C4446',
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  statLabel: {
+    marginTop: 6,
+    color: '#9EA2A3',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 10,
+    lineHeight: 12,
   },
 });
