@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { background, darkGray, FontFamily, primary, white } from '@/constants/theme';
@@ -9,7 +9,7 @@ import type { GroupFriend } from '@/src/mocks/group';
 import { mockGroupFriends } from '@/src/mocks/group';
 
 const whaleBackground = require('../../../assets/video/whale_background.mp4');
-const whaleCharacter = require('../../../assets/icons/whale1.png');
+const whaleCharacter = require('../../../assets/icons/whale_moving.png');
 const whaleGradation = require('../../../assets/icons/gradation.png');
 const noop = () => undefined;
 
@@ -26,6 +26,62 @@ function CloseIcon() {
     <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
       <Path d="M5 5L19 19M19 5L5 19" stroke={darkGray} strokeWidth={1.5} strokeLinecap="round" />
     </Svg>
+  );
+}
+
+function FloatingWhale({ size }: { size: 'group' | 'profile' }) {
+  const motion = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(motion, {
+          toValue: 1,
+          duration: 1300,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(motion, {
+          toValue: 0,
+          duration: 1300,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    loop.start();
+
+    return () => loop.stop();
+  }, [motion]);
+
+  const translateY = motion.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -10],
+  });
+  const rotate = motion.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['2deg', '7deg'],
+  });
+  const translateX = motion.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -1],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        size === 'profile' ? styles.profileWhaleMotion : styles.characterWhaleMotion,
+        {
+          transform: [{ translateX }, { translateY }, { rotate }],
+        },
+      ]}>
+      <Image
+        source={whaleCharacter}
+        style={size === 'profile' ? styles.profileImage : styles.characterImage}
+        contentFit="contain"
+      />
+    </Animated.View>
   );
 }
 
@@ -79,7 +135,7 @@ export default function GroupPage() {
             style={({ pressed }) => [styles.memberItem, pressed && styles.memberItemPressed]}>
             <View style={styles.characterStack}>
               <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
-              <Image source={whaleCharacter} style={styles.characterImage} contentFit="contain" />
+              <FloatingWhale size="group" />
             </View>
             <Text style={styles.characterName}>{friend.name}</Text>
           </Pressable>
@@ -105,7 +161,7 @@ export default function GroupPage() {
                 <View style={styles.profileLeft}>
                   <View style={styles.profileImageStack}>
                     <Image source={whaleGradation} style={styles.profileGradation} contentFit="contain" />
-                    <Image source={whaleCharacter} style={styles.profileImage} contentFit="contain" />
+                    <FloatingWhale size="profile" />
                   </View>
                   <Pressable accessibilityRole="button" onPress={noop} style={styles.visitButton}>
                     <Text style={styles.visitButtonText}>방문하기</Text>
@@ -203,12 +259,17 @@ const styles = StyleSheet.create({
     width: 123,
     height: 100,
   },
-  characterImage: {
+  characterWhaleMotion: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 123,
-    height: 96,
+    top: -2.3,
+    left: 4.13,
+    width: 120,
+    height: 97.2,
+    transformOrigin: '88% 50%',
+  },
+  characterImage: {
+    width: 120,
+    height: 97.2,
   },
   characterName: {
     marginTop: 8,
@@ -290,10 +351,15 @@ const styles = StyleSheet.create({
     width: 116,
     height: 96,
   },
-  profileImage: {
+  profileWhaleMotion: {
     position: 'absolute',
-    top: 0,
-    left: 0,
+    top: -2.3,
+    left: 4.13,
+    width: 110,
+    height: 97,
+    transformOrigin: '88% 50%',
+  },
+  profileImage: {
     width: 110,
     height: 97,
   },
