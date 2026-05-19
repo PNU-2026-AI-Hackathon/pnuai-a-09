@@ -246,18 +246,21 @@ const styles = StyleSheet.create({
     lineHeight: 12,
   },
   monthRow: {
-    flexDirection: 'row',
+    width: '100%',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
+    position: 'relative',
   },
   monthText: {
     color: '#000000',
     fontFamily: FontFamily.pretendardBold,
     fontSize: 20,
     lineHeight: 24,
-    marginLeft: 36
   },
   calendarButton: {
+    position: 'absolute',
+    left: '50%',
+    marginLeft: 28,
     width: 28,
     height: 28,
     alignItems: 'center',
