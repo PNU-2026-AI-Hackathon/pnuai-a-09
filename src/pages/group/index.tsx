@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, LayoutChangeEvent, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { background, darkGray, FontFamily, primary, white } from '@/constants/theme';
+import {background, darkGray, FontFamily, gray, primary, white} from '@/constants/theme';
+import { useGroupSelection } from '@/src/contexts/group-selection';
 import type { GroupFriend } from '@/src/mocks/group';
 import { mockGroupFriends } from '@/src/mocks/group';
 
@@ -14,9 +15,9 @@ const noop = () => undefined;
 const MEMBER_CARD_WIDTH = 123;
 const MEMBER_CARD_HEIGHT = 104;
 const BOUNCE_PADDING = {
-  top: 18,
+  top: 33,
   right: 18,
-  bottom: 92,
+  bottom: 77,
   left: 18,
 };
 
@@ -139,11 +140,16 @@ function FloatingWhale() {
 }
 
 export default function GroupPage() {
+  const { selectedGroup } = useGroupSelection();
   const [selectedFriend, setSelectedFriend] = useState<GroupFriend | null>(null);
   const [playArea, setPlayArea] = useState<PlayArea>({ width: 0, height: 0 });
   const [whaleMotions, setWhaleMotions] = useState<Record<string, WhaleMotion>>({});
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number | null>(null);
+  const activeFriends = useMemo(
+    () => mockGroupFriends.filter((friend) => selectedGroup.memberIds.includes(friend.id)),
+    [selectedGroup],
+  );
 
   const handleScreenLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -166,18 +172,18 @@ export default function GroupPage() {
       const next: Record<string, WhaleMotion> = {};
       const { minX, minY, maxX, maxY } = getMotionBounds(playArea);
 
-      mockGroupFriends.forEach((friend, index) => {
-        const existing = current[friend.tag];
+      activeFriends.forEach((friend, index) => {
+        const existing = current[friend.id];
 
         if (!existing) {
-          next[friend.tag] = createInitialMotion(index, playArea);
+          next[friend.id] = createInitialMotion(index, playArea);
           return;
         }
 
         const x = clamp(existing.x, minX, maxX);
         const y = clamp(existing.y, minY, maxY);
         existing.position.setValue({ x, y });
-        next[friend.tag] = {
+        next[friend.id] = {
           ...existing,
           x,
           y,
@@ -186,7 +192,13 @@ export default function GroupPage() {
 
       return next;
     });
-  }, [playArea]);
+  }, [activeFriends, playArea]);
+
+  useEffect(() => {
+    if (selectedFriend && !activeFriends.some((friend) => friend.id === selectedFriend.id)) {
+      setSelectedFriend(null);
+    }
+  }, [activeFriends, selectedFriend]);
 
   useEffect(() => {
     const motions = Object.values(whaleMotions);
@@ -250,8 +262,8 @@ export default function GroupPage() {
         contentFit="cover"
       />
       <View style={styles.memberLayer}>
-        {mockGroupFriends.map((friend) => {
-          const motion = whaleMotions[friend.tag];
+        {activeFriends.map((friend) => {
+          const motion = whaleMotions[friend.id];
 
           if (!motion) {
             return null;
@@ -259,7 +271,7 @@ export default function GroupPage() {
 
           return (
             <Animated.View
-              key={friend.tag}
+              key={friend.id}
               style={[
                 styles.movingMember,
                 {
@@ -360,9 +372,9 @@ const styles = StyleSheet.create({
   },
   backgroundImage: {
     position: 'absolute',
-    top: 10,
+    top: 25,
     right: 0,
-    bottom: -10,
+    bottom: -25,
     left: 0,
   },
   memberLayer: {
@@ -414,7 +426,8 @@ const styles = StyleSheet.create({
     color: '#9EA2A3',
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 10,
-    lineHeight: 14,
+    lineHeight: 10,
+    left: 4
   },
   inviteButton: {
     position: 'absolute',
@@ -452,20 +465,20 @@ const styles = StyleSheet.create({
   profileCard: {
     width: '100%',
     maxWidth: 379,
-    minHeight: 245,
+    minHeight: 220,
     borderRadius: 8,
     backgroundColor: white,
-    paddingTop: 42,
+    paddingTop: 24,
     paddingRight: 20,
     paddingBottom: 20,
     paddingLeft: 15,
   },
   closeButton: {
     position: 'absolute',
-    top: 20,
+    top: 15,
     right: 15,
-    width: 28,
-    height: 28,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -479,6 +492,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   profileImageFrame: {
+    marginTop: 20,
     width: 97,
     height: 64,
     alignItems: 'center',
@@ -515,14 +529,14 @@ const styles = StyleSheet.create({
   },
   profileTag: {
     marginTop: 2,
-    color: '#9EA2A3',
+    color: gray,
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 11,
     lineHeight: 14,
   },
   profileDescription: {
     marginTop: 10,
-    color: '#777777',
+    color: darkGray,
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 12,
     lineHeight: 18,

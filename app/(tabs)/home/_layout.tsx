@@ -4,17 +4,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HomeHeader } from '@/components/home/home-header';
 import { background } from '@/constants/theme';
+import { GroupSelectionProvider } from '@/src/contexts/group-selection';
 
 export default function HomeLayout() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <HomeHeader />
-      <View style={styles.stackWrap}>
-        <Slot />
+    <GroupSelectionProvider>
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <HomeHeader />
+        <View style={styles.stackWrap}>
+          <Slot />
+        </View>
       </View>
-    </View>
+    </GroupSelectionProvider>
   );
 }
 
