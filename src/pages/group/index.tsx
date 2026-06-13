@@ -107,6 +107,7 @@ export default function GroupPage() {
               <FloatingWhale />
             </View>
             <Text style={styles.characterName}>{friend.name}</Text>
+            <Text style={styles.characterTag}>@{friend.tag}</Text>
           </Pressable>
         ))}
       </View>
@@ -139,6 +140,9 @@ export default function GroupPage() {
                 <View style={styles.profileRight}>
                   <Text style={styles.profileName} numberOfLines={1}>
                     {selectedFriend.name}
+                  </Text>
+                  <Text style={styles.profileTag} numberOfLines={1}>
+                    @{selectedFriend.tag}
                   </Text>
                   <Text style={styles.profileDescription} numberOfLines={3}>
                     {selectedFriend.description}
@@ -232,6 +236,12 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 12,
     lineHeight: 18,
+  },
+  characterTag: {
+    color: '#9EA2A3',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 10,
+    lineHeight: 14,
   },
   inviteButton: {
     position: 'absolute',
@@ -330,8 +340,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
   },
+  profileTag: {
+    marginTop: 2,
+    color: '#9EA2A3',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 11,
+    lineHeight: 14,
+  },
   profileDescription: {
-    marginTop: 14,
+    marginTop: 10,
     color: '#777777',
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 12,
