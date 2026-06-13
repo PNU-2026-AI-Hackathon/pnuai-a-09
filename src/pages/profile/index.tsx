@@ -7,7 +7,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { PencilIcon } from '@/components/icons/pencil-icon';
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
-import { darkGray, FontFamily, gray, primary, white } from '@/constants/theme';
+import {background, darkGray, FontFamily, gray, lightGray, primary, white} from '@/constants/theme';
 import { mockUsers } from '@/src/mocks/users';
 
 const whaleImage = require('../../../assets/icons/whale1.png');
@@ -26,19 +26,17 @@ function getInstalledDays(installedAt: string) {
 function ProgressGauge({ days }: { days: number }) {
   const progress = Math.min(days / NEXT_LEVEL_DAYS, 1);
   const endAngle = -180 + 180 * progress;
-  const radius = 42;
-  const centerX = 58;
-  const centerY = 58;
-  const start = polarToCartesian(centerX, centerY, radius, -180);
-  const end = polarToCartesian(centerX, centerY, radius, endAngle);
-  const largeArcFlag = progress > 0.5 ? 1 : 0;
-  const activePath = `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
+  const radius = 50;
+  const centerX = 70;
+  const centerY = 54;
+  const inactivePath = createArcPath(centerX, centerY, radius, -180, 0);
+  const activePath = createArcPath(centerX, centerY, radius, -180, endAngle);
 
   return (
     <View style={styles.gaugeWrap}>
-      <Svg width={116} height={72} viewBox="0 0 116 72">
-        <Path d="M 16 58 A 42 42 0 0 1 100 58" stroke="#E8ECEE" strokeWidth={6} strokeLinecap="round" fill="none" />
-        <Path d={activePath} stroke={primary} strokeWidth={6} strokeLinecap="round" fill="none" />
+      <Svg width={180} height={130} viewBox="0 0 145 92">
+        <Path d={inactivePath} stroke="#E8ECEE" strokeWidth={5} strokeLinecap="round" fill="none" />
+        <Path d={activePath} stroke={primary} strokeWidth={5} strokeLinecap="round" fill="none" />
       </Svg>
       <View style={styles.gaugeTextWrap}>
         <Text style={styles.gaugeValue}>{days}</Text>
@@ -47,6 +45,20 @@ function ProgressGauge({ days }: { days: number }) {
       <Text style={styles.gaugeHint}>다음 친밀도까지 {Math.max(NEXT_LEVEL_DAYS - days, 0)}일 남았어요!</Text>
     </View>
   );
+}
+
+function createArcPath(
+  centerX: number,
+  centerY: number,
+  radius: number,
+  startAngle: number,
+  endAngle: number,
+) {
+  const start = polarToCartesian(centerX, centerY, radius, startAngle);
+  const end = polarToCartesian(centerX, centerY, radius, endAngle);
+  const largeArcFlag = Math.abs(endAngle - startAngle) > 180 ? 1 : 0;
+
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
 }
 
 function polarToCartesian(centerX: number, centerY: number, radius: number, angleInDegrees: number) {
@@ -97,36 +109,42 @@ export default function ProfilePage() {
         overScrollMode="never">
         <View style={styles.hero}>
           <View style={styles.topIcons}>
-            <Ionicons name="notifications-outline" size={24} color={darkGray} />
-            <Ionicons name="settings-outline" size={24} color={darkGray} />
+            <View style={styles.iconHit}>
+              <Ionicons name="notifications-outline" size={22} color={darkGray} />
+            </View>
+            <View style={styles.iconHit}>
+              <Ionicons name="settings-outline" size={22} color={darkGray} />
+            </View>
           </View>
 
-          <View style={styles.profileTopRow}>
-            <View style={styles.profileImageWrap}>
-              <Image source={currentUser.profile_image} style={styles.profileImage} contentFit="cover" />
-            </View>
-
-            <View style={styles.profileDescriptionWrap}>
-              <View style={styles.descriptionBubble}>
-                <Text style={styles.descriptionText}>{currentUser.description}</Text>
+          <View style={styles.heroContent}>
+            <View style={styles.profileTopRow}>
+              <View style={styles.profileImageWrap}>
+                <Image source={currentUser.profile_image} style={styles.profileImage} contentFit="cover" />
               </View>
-              <Text style={styles.editText}>Edit</Text>
-            </View>
-          </View>
 
-          <View style={styles.profileStatsRow}>
-            <View style={styles.profileNameBlock}>
-              <Text style={styles.name}>{currentUser.name}</Text>
-              <Text style={styles.tag}>@{currentUser.tag}</Text>
+              <View style={styles.profileDescriptionWrap}>
+                <View style={styles.descriptionBubble}>
+                  <Text style={styles.descriptionText}>{currentUser.description}</Text>
+                </View>
+                <Text style={styles.editText}>Edit</Text>
+              </View>
             </View>
-            <View style={styles.followItem}>
-              <Text style={styles.followValue}>{currentUser.friends_count}</Text>
-              <Text style={styles.followLabel}>Follower</Text>
-            </View>
-            <View style={styles.followDivider} />
-            <View style={styles.followItem}>
-              <Text style={styles.followValue}>{currentUser.friends_count}</Text>
-              <Text style={styles.followLabel}>Following</Text>
+
+            <View style={styles.profileStatsRow}>
+              <View style={styles.profileNameBlock}>
+                <Text style={styles.name}>{currentUser.name}</Text>
+                <Text style={styles.tag}>@{currentUser.tag}</Text>
+              </View>
+              <View style={styles.followItem}>
+                <Text style={styles.followValue}>{currentUser.friends_count}</Text>
+                <Text style={styles.followLabel}>Follower</Text>
+              </View>
+              <View style={styles.followDivider} />
+              <View style={styles.followItem}>
+                <Text style={styles.followValue}>{currentUser.friends_count}</Text>
+                <Text style={styles.followLabel}>Following</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -135,14 +153,16 @@ export default function ProfilePage() {
           <Text style={styles.sectionTitle}>Streaks</Text>
           <View style={styles.mainStreakCard}>
             <View style={styles.cardTitleRow}>
-              <SmallWhaleIcon size={14} color={darkGray} />
+              <SmallWhaleIcon size={16} color={darkGray} />
               <Text style={styles.mainCardTitle}>고래와 함께한지</Text>
             </View>
             <View style={styles.mainStreakBody}>
               <View style={styles.whaleLevel}>
                 <Image source={whaleImage} style={styles.whaleImage} contentFit="contain" />
-                <Text style={styles.levelText}>친밀도</Text>
-                <Text style={styles.levelValue}>{currentUser.intimacy_level}단계</Text>
+                <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 10}} >
+                  <Text style={styles.levelText}>친밀도</Text>
+                  <Text style={styles.levelValue}>{currentUser.intimacy_level}단계</Text>
+                </View>
               </View>
               <ProgressGauge days={installedDays} />
             </View>
@@ -150,7 +170,7 @@ export default function ProfilePage() {
 
           <View style={styles.statGrid}>
             <StatCard
-              icon={<PencilIcon size={14} color={darkGray} />}
+              icon={<PencilIcon size={13} color={darkGray} />}
               title="작성한 일기 수"
               value={currentUser.post_count}
               unit="개"
@@ -171,67 +191,75 @@ export default function ProfilePage() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#B9ECFB',
+    backgroundColor: '#AFE7FF',
   },
   screen: {
     flex: 1,
-    backgroundColor: '#F4F6F7',
+    backgroundColor: background,
   },
   content: {
-    paddingBottom: 112,
+    paddingBottom: 80,
   },
   hero: {
     minHeight: 352,
-    backgroundColor: '#B9ECFB',
-    paddingHorizontal: 36,
-    paddingTop: 22,
+    backgroundColor: '#AFE7FF',
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   topIcons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 16,
+    alignItems: 'center',
+    gap: 12,
+  },
+  iconHit: {
+    padding: 4,
+  },
+  heroContent: {
+    paddingHorizontal: 20,
+    paddingTop: 34,
   },
   profileTopRow: {
-    marginTop: 34,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 20,
+    gap: 16,
   },
   profileImageWrap: {
     width: 88,
     alignItems: 'center',
   },
   profileImage: {
-    width: 74,
-    height: 74,
+    width: 78,
+    height: 78,
     borderRadius: 37,
   },
   name: {
     color: darkGray,
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 14,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   tag: {
     marginTop: 3,
-    color: gray,
-    fontFamily: FontFamily.pretendardMedium,
+    left: 4,
+    color: '#777777',
+    fontFamily: FontFamily.pretendardRegular,
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: 12,
   },
   profileDescriptionWrap: {
     flex: 1,
     paddingTop: 8,
   },
   descriptionBubble: {
-    minHeight: 70,
-    borderRadius: 6,
+    minHeight: 60,
+    borderRadius: 5,
     backgroundColor: white,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    shadowColor: '#3C4446',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    shadowColor: lightGray,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.5,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -239,17 +267,17 @@ const styles = StyleSheet.create({
     color: darkGray,
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 11,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   editText: {
     marginTop: 8,
     alignSelf: 'flex-end',
-    color: '#7D8A8E',
+    color: '#777777',
     fontFamily: FontFamily.pretendardMedium,
     fontSize: 11,
   },
   profileStatsRow: {
-    marginTop: 20,
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -264,42 +292,42 @@ const styles = StyleSheet.create({
   },
   followValue: {
     color: darkGray,
-    fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 18,
-    lineHeight: 24,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 16,
+    lineHeight: 18,
   },
   followLabel: {
     marginTop: 5,
-    color: '#778489',
+    color: '#777777',
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 11,
+    fontSize: 10,
   },
   followDivider: {
-    width: 1,
-    height: 42,
-    backgroundColor: '#9BD7E8',
+    width: 0.5,
+    height: 32,
+    backgroundColor: gray,
   },
   streakSection: {
-    marginTop: -62,
+    marginTop: -100,
     borderTopLeftRadius: 42,
     borderTopRightRadius: 42,
-    backgroundColor: '#F4F6F7',
-    paddingTop: 40,
+    backgroundColor: background,
+    paddingTop: 30,
     paddingHorizontal: 30,
   },
   sectionTitle: {
     color: darkGray,
     fontFamily: FontFamily.pretendardBold,
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 20,
+    lineHeight: 24,
   },
   mainStreakCard: {
-    marginTop: 34,
-    minHeight: 186,
+    marginTop: 30,
     borderRadius: 10,
     backgroundColor: white,
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 30,
     shadowColor: '#3C4446',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.1,
@@ -318,7 +346,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   mainStreakBody: {
-    marginTop: 20,
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -328,28 +356,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   whaleImage: {
+    marginTop: 10,
     width: 86,
-    height: 62,
+    height: 56,
   },
   levelText: {
-    marginTop: 10,
     color: gray,
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 10,
   },
   levelValue: {
-    marginTop: 2,
+    marginLeft: 4,
     color: darkGray,
-    fontFamily: FontFamily.pretendardSemiBold,
+    fontFamily: FontFamily.pretendardMedium,
     fontSize: 11,
   },
   gaugeWrap: {
-    width: 150,
+    width: 164,
     alignItems: 'center',
   },
   gaugeTextWrap: {
     position: 'absolute',
-    top: 24,
+    top: 30,
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
@@ -363,12 +391,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginLeft: 4,
     color: darkGray,
-    fontFamily: FontFamily.pretendardMedium,
-    fontSize: 13,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 12,
   },
   gaugeHint: {
-    marginTop: -2,
-    color: gray,
+    marginTop: -60,
+    color: '#777777',
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 9,
   },
@@ -379,10 +407,9 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    minHeight: 166,
     borderRadius: 10,
     backgroundColor: white,
-    paddingTop: 20,
+    paddingTop: 16,
     paddingHorizontal: 18,
     shadowColor: '#3C4446',
     shadowOffset: { width: 0, height: 0 },
@@ -410,18 +437,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 40
   },
   statNumber: {
     color: darkGray,
     fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 40,
+    fontSize: 36,
     lineHeight: 46,
   },
   statUnit: {
-    marginLeft: 6,
+    marginLeft: 4,
     marginTop: 16,
     color: darkGray,
-    fontFamily: FontFamily.pretendardMedium,
-    fontSize: 13,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 12,
   },
 });

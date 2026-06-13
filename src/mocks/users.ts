@@ -34,7 +34,7 @@ export const mockUsers: MockUser[] = [
     tag: 'sozzzn',
     profile_image: testProfileImage,
     description: '작은 일도 놓치지 않고 다정하게 봐주는 칭찬을 좋아해요',
-    installed_at: '2026-05-16',
+    installed_at: '2026-05-20',
     intimacy_level: 1,
     friends_count: 18,
     like_count: 74,
