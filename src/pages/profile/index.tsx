@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
@@ -96,6 +97,7 @@ function StatCard({
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
   const installedDays = getInstalledDays(currentUser.installed_at);
 
   return (
@@ -127,7 +129,13 @@ export default function ProfilePage() {
                 <View style={styles.descriptionBubble}>
                   <Text style={styles.descriptionText}>{currentUser.description}</Text>
                 </View>
-                <Text style={styles.editText}>Edit</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="프로필 편집"
+                  onPress={() => router.push('/(tabs)/profile-edit')}
+                  style={({ pressed }) => pressed && styles.editPressed}>
+                  <Text style={styles.editText}>Edit</Text>
+                </Pressable>
               </View>
             </View>
 
@@ -275,6 +283,9 @@ const styles = StyleSheet.create({
     color: '#777777',
     fontFamily: FontFamily.pretendardMedium,
     fontSize: 11,
+  },
+  editPressed: {
+    opacity: 0.7,
   },
   profileStatsRow: {
     marginTop: 10,
