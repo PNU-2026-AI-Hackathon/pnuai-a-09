@@ -60,7 +60,7 @@ export default function ProfileEditPage() {
           </View>
 
           <View style={styles.form}>
-            <FieldRow label="닉네임" count={`${nickname.length}/${MAX_NICKNAME_LENGTH}`}>
+            <FieldRow label="닉네임" count={`(${nickname.length}/${MAX_NICKNAME_LENGTH})`}>
               <TextInput
                 value={nickname}
                 onChangeText={(text) => setNickname(text.slice(0, MAX_NICKNAME_LENGTH))}
@@ -71,7 +71,7 @@ export default function ProfileEditPage() {
               />
             </FieldRow>
 
-            <FieldRow label="아이디" count={`${tag.length}/${MAX_TAG_LENGTH}`}>
+            <FieldRow label="아이디" count={`(${tag.length}/${MAX_TAG_LENGTH})`}>
               <TextInput
                 value={tag}
                 onChangeText={(text) => setTag(text.replace(/^@/, '').slice(0, MAX_TAG_LENGTH))}
@@ -83,7 +83,7 @@ export default function ProfileEditPage() {
               />
             </FieldRow>
 
-            <FieldRow label="소개" count={`${description.length}/${MAX_DESCRIPTION_LENGTH}`} multiline>
+            <FieldRow label="소개" count={`(${description.length}/${MAX_DESCRIPTION_LENGTH})`} multiline>
               <TextInput
                 value={description}
                 onChangeText={(text) => setDescription(text.slice(0, MAX_DESCRIPTION_LENGTH))}
@@ -171,34 +171,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profileImage: {
-    width: 88,
-    height: 88,
+    width: 82,
+    height: 82,
     borderRadius: 44,
   },
   cameraButton: {
     position: 'absolute',
     right: '50%',
     bottom: 0,
-    marginRight: -48,
+    marginRight: -42,
     width: 28,
     height: 28,
     borderRadius: 14,
     backgroundColor: '#D9D9D9',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   form: {
-    marginTop: 42,
+    marginTop: 30,
     paddingHorizontal: 24,
-    gap: 18,
+    gap: 10,
   },
   fieldRow: {
-    minHeight: 58,
+    minHeight: 42,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 10,
   },
   multilineFieldRow: {
     alignItems: 'flex-start',
@@ -213,11 +213,11 @@ const styles = StyleSheet.create({
   fieldBox: {
     flex: 1,
     minHeight: 46,
-    borderRadius: 4,
+    borderRadius: 5,
     backgroundColor: background,
     justifyContent: 'center',
     paddingLeft: 14,
-    paddingRight: 54,
+    paddingRight: 12,
   },
   descriptionBox: {
     height: 140,
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   countText: {
     position: 'absolute',
     right: 14,
-    bottom: 12,
+    bottom: 16,
     color: gray,
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 12,
