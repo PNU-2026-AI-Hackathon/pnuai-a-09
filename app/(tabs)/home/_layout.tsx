@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HomeHeader } from '@/components/home/home-header';
+import { background } from '@/constants/theme';
 
 export default function HomeLayout() {
   const insets = useSafeAreaInsets();
@@ -20,7 +21,7 @@ export default function HomeLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: background,
   },
   stackWrap: {
     flex: 1,

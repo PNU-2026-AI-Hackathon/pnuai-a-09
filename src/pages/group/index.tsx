@@ -1,7 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { background, darkGray, FontFamily, primary, white } from '@/constants/theme';
@@ -9,7 +8,7 @@ import type { GroupFriend } from '@/src/mocks/group';
 import { mockGroupFriends } from '@/src/mocks/group';
 
 const groupBackground = require('../../../assets/icons/group_background.png');
-const whaleCharacter = require('../../../assets/icons/whale_moving.png');
+const whaleCharacter = require('../../../assets/icons/whale1.png');
 const whaleGradation = require('../../../assets/icons/gradation.png');
 const noop = () => undefined;
 
@@ -29,7 +28,7 @@ function CloseIcon() {
   );
 }
 
-function FloatingWhale({ size }: { size: 'group' | 'profile' }) {
+function FloatingWhale() {
   const motion = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -71,14 +70,14 @@ function FloatingWhale({ size }: { size: 'group' | 'profile' }) {
   return (
     <Animated.View
       style={[
-        size === 'profile' ? styles.profileWhaleMotion : styles.characterWhaleMotion,
+        styles.characterWhaleMotion,
         {
           transform: [{ translateX }, { translateY }, { rotate }],
         },
       ]}>
       <Image
         source={whaleCharacter}
-        style={size === 'profile' ? styles.profileImage : styles.characterImage}
+        style={styles.characterImage}
         contentFit="contain"
       />
     </Animated.View>
@@ -89,103 +88,96 @@ export default function GroupPage() {
   const [selectedFriend, setSelectedFriend] = useState<GroupFriend | null>(null);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.screen}>
-        <Image
-          source={groupBackground}
-          style={styles.backgroundImage}
-          contentFit="cover"
-        />
-        <View style={styles.memberList}>
-          {mockGroupFriends.map((friend) => (
+    <View style={styles.screen}>
+      <Image
+        source={groupBackground}
+        style={styles.backgroundImage}
+        contentFit="cover"
+      />
+      <View style={styles.memberList}>
+        {mockGroupFriends.map((friend) => (
+          <Pressable
+            key={friend.name}
+            accessibilityRole="button"
+            accessibilityLabel={`${friend.name} 프로필 보기`}
+            onPress={() => setSelectedFriend(friend)}
+            style={({ pressed }) => [styles.memberItem, pressed && styles.memberItemPressed]}>
+            <View style={styles.characterStack}>
+              <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
+              <FloatingWhale />
+            </View>
+            <Text style={styles.characterName}>{friend.name}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Modal
+        visible={selectedFriend !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedFriend(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.profileCard}>
             <Pressable
-              key={friend.name}
               accessibilityRole="button"
-              accessibilityLabel={`${friend.name} 프로필 보기`}
-              onPress={() => setSelectedFriend(friend)}
-              style={({ pressed }) => [styles.memberItem, pressed && styles.memberItemPressed]}>
-              <View style={styles.characterStack}>
-                <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
-                <FloatingWhale size="group" />
-              </View>
-              <Text style={styles.characterName}>{friend.name}</Text>
+              accessibilityLabel="프로필 닫기"
+              onPress={() => setSelectedFriend(null)}
+              hitSlop={8}
+              style={styles.closeButton}>
+              <CloseIcon />
             </Pressable>
-          ))}
-        </View>
-        <Modal
-          visible={selectedFriend !== null}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setSelectedFriend(null)}>
-          <View style={styles.modalBackdrop}>
-            <View style={styles.profileCard}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="프로필 닫기"
-                onPress={() => setSelectedFriend(null)}
-                hitSlop={8}
-                style={styles.closeButton}>
-                <CloseIcon />
-              </Pressable>
-              {selectedFriend ? (
-                <View style={styles.profileContent}>
-                  <View style={styles.profileLeft}>
-                    <View style={styles.profileImageStack}>
-                      <Image source={whaleGradation} style={styles.profileGradation} contentFit="contain" />
-                      <FloatingWhale size="profile" />
-                    </View>
-                    <Pressable accessibilityRole="button" onPress={noop} style={styles.visitButton}>
-                      <Text style={styles.visitButtonText}>방문하기</Text>
-                    </Pressable>
+            {selectedFriend ? (
+              <View style={styles.profileContent}>
+                <View style={styles.profileLeft}>
+                  <View style={styles.profileImageFrame}>
+                    <Image source={whaleCharacter} style={styles.profileImage} contentFit="contain" />
                   </View>
+                  <Pressable accessibilityRole="button" onPress={noop} style={styles.visitButton}>
+                    <Text style={styles.visitButtonText}>방문하기</Text>
+                  </Pressable>
+                </View>
 
-                  <View style={styles.profileRight}>
-                    <Text style={styles.profileName} numberOfLines={1}>
-                      {selectedFriend.name}
-                    </Text>
-                    <Text style={styles.profileDescription} numberOfLines={3}>
-                      {selectedFriend.description}
-                    </Text>
-                    <View style={styles.statRow}>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{selectedFriend.friends_count}</Text>
-                        <Text style={styles.statLabel}>Friends</Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{selectedFriend.like_count}</Text>
-                        <Text style={styles.statLabel}>Like</Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{selectedFriend.post_count}</Text>
-                        <Text style={styles.statLabel}>Post</Text>
-                      </View>
+                <View style={styles.profileRight}>
+                  <Text style={styles.profileName} numberOfLines={1}>
+                    {selectedFriend.name}
+                  </Text>
+                  <Text style={styles.profileDescription} numberOfLines={3}>
+                    {selectedFriend.description}
+                  </Text>
+                  <View style={styles.statRow}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{selectedFriend.friends_count}</Text>
+                      <Text style={styles.statLabel}>Friends</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{selectedFriend.like_count}</Text>
+                      <Text style={styles.statLabel}>Like</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{selectedFriend.post_count}</Text>
+                      <Text style={styles.statLabel}>Post</Text>
                     </View>
                   </View>
                 </View>
-              ) : null}
-            </View>
+              </View>
+            ) : null}
           </View>
-        </Modal>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="친구초대"
-          onPress={noop}
-          style={({ pressed }) => [styles.inviteButton, pressed && styles.inviteButtonPressed]}>
-          <Text style={styles.inviteText}>친구초대</Text>
-          <View style={styles.inviteIcon}>
-            <PlusIcon />
-          </View>
-        </Pressable>
-      </View>
-    </SafeAreaView>
+        </View>
+      </Modal>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="친구초대"
+        onPress={noop}
+        style={({ pressed }) => [styles.inviteButton, pressed && styles.inviteButtonPressed]}>
+        <Text style={styles.inviteText}>친구초대</Text>
+        <View style={styles.inviteIcon}>
+          <PlusIcon />
+        </View>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: background,
-  },
   screen: {
     flex: 1,
     overflow: 'hidden',
@@ -215,33 +207,30 @@ const styles = StyleSheet.create({
     opacity: 0.78,
   },
   characterStack: {
-    width: 123,
-    height: 96,
+    width: 90,
+    height: 60,
   },
   characterGradation: {
     position: 'absolute',
-    right: -16,
-    bottom: -4,
-    width: 123,
-    height: 100,
+    width: 75,
+    height: 68,
   },
   characterWhaleMotion: {
     position: 'absolute',
-    top: -2.3,
-    left: 4.13,
-    width: 120,
-    height: 97.2,
-    transformOrigin: '88% 50%',
+    top: 12,
+    width: 74,
+    height: 50,
+    transformOrigin: '80% 50%',
   },
   characterImage: {
-    width: 120,
-    height: 97.2,
+    width: 74,
+    height: 50,
   },
   characterName: {
     marginTop: 8,
     color: darkGray,
     fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 14,
+    fontSize: 12,
     lineHeight: 18,
   },
   inviteButton: {
@@ -306,28 +295,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 12,
   },
-  profileImageStack: {
-    width: 116,
-    height: 92,
-  },
-  profileGradation: {
-    position: 'absolute',
-    right: -12,
-    bottom: -5,
-    width: 116,
-    height: 96,
-  },
-  profileWhaleMotion: {
-    position: 'absolute',
-    top: -2.3,
-    left: 4.13,
-    width: 110,
-    height: 97,
-    transformOrigin: '88% 50%',
+  profileImageFrame: {
+    width: 97,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileImage: {
-    width: 110,
-    height: 97,
+    width: 97,
+    height: 64,
   },
   visitButton: {
     marginTop: 18,

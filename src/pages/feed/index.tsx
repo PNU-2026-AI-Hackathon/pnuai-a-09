@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { mockPosts } from '@/src/mocks/posts';
 import type { FeedPost } from '@/src/types/api/feed-post';
@@ -25,32 +25,26 @@ export default function FeedPage() {
   const bottomPad = fabBottom + FAB_SIZE + 16;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.screen}>
-        <FlatList
-          data={mockPosts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad }]}
-          showsVerticalScrollIndicator={false}
-        />
-        <Pressable
-          style={[styles.fab, { bottom: fabBottom }]}
-          accessibilityRole="button"
-          accessibilityLabel="글 작성"
-          onPress={() => router.push('/(tabs)/write')}>
-          <PencilIcon size={22} />
-        </Pressable>
-      </View>
-    </SafeAreaView>
+    <View style={styles.screen}>
+      <FlatList
+        data={mockPosts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad }]}
+        showsVerticalScrollIndicator={false}
+      />
+      <Pressable
+        style={[styles.fab, { bottom: fabBottom }]}
+        accessibilityRole="button"
+        accessibilityLabel="글 작성"
+        onPress={() => router.push('/(tabs)/write')}>
+        <PencilIcon size={22} />
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: background,
-  },
   screen: {
     flex: 1,
     backgroundColor: background,
