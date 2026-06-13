@@ -111,9 +111,13 @@ export default function ProfilePage() {
         overScrollMode="never">
         <View style={styles.hero}>
           <View style={styles.topIcons}>
-            <View style={styles.iconHit}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="알림"
+              onPress={() => router.push('/(tabs)/profile/notifications')}
+              style={({ pressed }) => [styles.iconHit, pressed && styles.iconPressed]}>
               <Ionicons name="notifications-outline" size={22} color={darkGray} />
-            </View>
+            </Pressable>
             <View style={styles.iconHit}>
               <Ionicons name="settings-outline" size={22} color={darkGray} />
             </View>
@@ -132,7 +136,7 @@ export default function ProfilePage() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="프로필 편집"
-                  onPress={() => router.push('/(tabs)/profile-edit')}
+                  onPress={() => router.push('/(tabs)/profile/edit')}
                   style={({ pressed }) => pressed && styles.editPressed}>
                   <Text style={styles.editText}>Edit</Text>
                 </Pressable>
@@ -222,6 +226,9 @@ const styles = StyleSheet.create({
   },
   iconHit: {
     padding: 4,
+  },
+  iconPressed: {
+    opacity: 0.7,
   },
   heroContent: {
     paddingHorizontal: 20,
