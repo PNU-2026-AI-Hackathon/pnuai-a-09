@@ -188,6 +188,60 @@ export default function GroupPage() {
     });
   }, [playArea]);
 
+  useEffect(() => {
+    const motions = Object.values(whaleMotions);
+
+    if (playArea.width <= 0 || playArea.height <= 0 || motions.length === 0) {
+      return;
+    }
+
+    const bounds = getMotionBounds(playArea);
+
+    const tick = (timestamp: number) => {
+      const previousTimestamp = lastFrameTimeRef.current ?? timestamp;
+      const deltaSeconds = Math.min((timestamp - previousTimestamp) / 1000, 0.05);
+      lastFrameTimeRef.current = timestamp;
+
+      motions.forEach((motion) => {
+        let nextX = motion.x + motion.vx * deltaSeconds;
+        let nextY = motion.y + motion.vy * deltaSeconds;
+
+        if (nextX <= bounds.minX) {
+          nextX = bounds.minX;
+          motion.vx = Math.abs(motion.vx);
+        } else if (nextX >= bounds.maxX) {
+          nextX = bounds.maxX;
+          motion.vx = -Math.abs(motion.vx);
+        }
+
+        if (nextY <= bounds.minY) {
+          nextY = bounds.minY;
+          motion.vy = Math.abs(motion.vy);
+        } else if (nextY >= bounds.maxY) {
+          nextY = bounds.maxY;
+          motion.vy = -Math.abs(motion.vy);
+        }
+
+        motion.x = nextX;
+        motion.y = nextY;
+        motion.position.setValue({ x: nextX, y: nextY });
+      });
+
+      animationFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      animationFrameRef.current = null;
+      lastFrameTimeRef.current = null;
+    };
+  }, [playArea, whaleMotions]);
+
   return (
     <View style={styles.screen} onLayout={handleScreenLayout}>
       <Image
@@ -195,22 +249,38 @@ export default function GroupPage() {
         style={styles.backgroundImage}
         contentFit="cover"
       />
-      <View style={styles.memberList}>
-        {mockGroupFriends.map((friend) => (
-          <Pressable
-            key={friend.name}
-            accessibilityRole="button"
-            accessibilityLabel={`${friend.name} 프로필 보기`}
-            onPress={() => setSelectedFriend(friend)}
-            style={({ pressed }) => [styles.memberItem, pressed && styles.memberItemPressed]}>
-            <View style={styles.characterStack}>
-              <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
-              <FloatingWhale />
-            </View>
-            <Text style={styles.characterName}>{friend.name}</Text>
-            <Text style={styles.characterTag}>@{friend.tag}</Text>
-          </Pressable>
-        ))}
+      <View style={styles.memberLayer}>
+        {mockGroupFriends.map((friend) => {
+          const motion = whaleMotions[friend.tag];
+
+          if (!motion) {
+            return null;
+          }
+
+          return (
+            <Animated.View
+              key={friend.tag}
+              style={[
+                styles.movingMember,
+                {
+                  transform: motion.position.getTranslateTransform(),
+                },
+              ]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${friend.name} 프로필 보기`}
+                onPress={() => setSelectedFriend(friend)}
+                style={({ pressed }) => [styles.memberItem, pressed && styles.memberItemPressed]}>
+                <View style={styles.characterStack}>
+                  <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
+                  <FloatingWhale />
+                </View>
+                <Text style={styles.characterName}>{friend.name}</Text>
+                <Text style={styles.characterTag}>@{friend.tag}</Text>
+              </Pressable>
+            </Animated.View>
+          );
+        })}
       </View>
       <Modal
         visible={selectedFriend !== null}
@@ -295,17 +365,19 @@ const styles = StyleSheet.create({
     bottom: -10,
     left: 0,
   },
-  memberList: {
+  memberLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  movingMember: {
     position: 'absolute',
-    top: 174,
-    left: 18,
-    right: 18,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 18,
+    top: 0,
+    left: 0,
+    width: MEMBER_CARD_WIDTH,
+    height: MEMBER_CARD_HEIGHT,
   },
   memberItem: {
-    width: 123,
+    width: MEMBER_CARD_WIDTH,
+    height: MEMBER_CARD_HEIGHT,
     alignItems: 'center',
   },
   memberItemPressed: {
