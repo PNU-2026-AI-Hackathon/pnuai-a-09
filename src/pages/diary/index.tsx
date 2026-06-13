@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Modal,
@@ -13,6 +13,7 @@ import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import { background, darkGray, FontFamily, FontSize, gray, lightGray, primary, white } from '@/constants/theme';
 import { mockDiaryCategories, mockDiaryEntries } from '@/src/mocks/posts';
+import { fetchDiaryArchiveByUserTag } from '@/src/services/diary';
 
 const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTH_LABELS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -71,9 +72,35 @@ export default function DiaryPage() {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [failedDiaryImages, setFailedDiaryImages] = useState<Record<number, boolean>>({});
   const [failedCategoryImages, setFailedCategoryImages] = useState<Record<string, boolean>>({});
+  const [diaryEntries, setDiaryEntries] = useState(mockDiaryEntries);
+  const [diaryCategories, setDiaryCategories] = useState(mockDiaryCategories);
 
   const weeks = useMemo(() => getCalendarWeeks(selectedYear, selectedMonth), [selectedMonth, selectedYear]);
-  const entriesByDay = useMemo(() => new Map(mockDiaryEntries.map((entry) => [entry.day, entry])), []);
+  const entriesByDay = useMemo(() => new Map(diaryEntries.map((entry) => [entry.day, entry])), [diaryEntries]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setFailedDiaryImages({});
+    setFailedCategoryImages({});
+
+    fetchDiaryArchiveByUserTag('sozzzn', selectedYear, selectedMonth)
+      .then((archive) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setDiaryEntries(archive.entries);
+        setDiaryCategories(archive.categories);
+      })
+      .catch((error) => {
+        console.warn('[diary] Failed to load archive', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedMonth, selectedYear]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -142,7 +169,7 @@ export default function DiaryPage() {
             horizontal
             contentContainerStyle={styles.categoryList}
             showsHorizontalScrollIndicator={false}>
-            {mockDiaryCategories.map((category) => {
+            {diaryCategories.map((category) => {
               const showImage = category.image && !failedCategoryImages[category.id];
 
               return (

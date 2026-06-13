@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
 import type { MockNotification } from '@/src/mocks/notifications';
-import { mockNotifications } from '@/src/mocks/notifications';
 import { mockUsers } from '@/src/mocks/users';
+import { AppNotification, fetchNotificationsForUserTag } from '@/src/services/notifications';
 
 const SECTION_LABELS: Record<MockNotification['section'], string> = {
   today: '오늘',
@@ -16,12 +17,12 @@ const SECTION_LABELS: Record<MockNotification['section'], string> = {
 
 const SECTION_ORDER: MockNotification['section'][] = ['today', 'last_week'];
 
-function getActorName(actorUserId: string) {
-  return mockUsers.find((user) => user.id === actorUserId)?.name ?? '친구';
+function getActorName(notification: AppNotification) {
+  return notification.actorName ?? mockUsers.find((user) => user.id === notification.actorUserId)?.name ?? '친구';
 }
 
-function getActorProfileImage(actorUserId: string) {
-  return mockUsers.find((user) => user.id === actorUserId)?.profile_image;
+function getActorProfileImage(notification: AppNotification) {
+  return notification.actorProfileImage ?? mockUsers.find((user) => user.id === notification.actorUserId)?.profile_image;
 }
 
 function getNotificationMessageSuffix(notification: MockNotification) {
@@ -40,8 +41,8 @@ function getNotificationMessageSuffix(notification: MockNotification) {
   return '님이 새 게시글을 올렸습니다.';
 }
 
-function NotificationAvatar({ notification }: { notification: MockNotification }) {
-  const profileImage = getActorProfileImage(notification.actorUserId);
+function NotificationAvatar({ notification }: { notification: AppNotification }) {
+  const profileImage = getActorProfileImage(notification);
 
   return (
     <View style={styles.avatarWrap}>
@@ -59,8 +60,8 @@ function NotificationAvatar({ notification }: { notification: MockNotification }
   );
 }
 
-function NotificationItem({ notification }: { notification: MockNotification }) {
-  const actorName = getActorName(notification.actorUserId);
+function NotificationItem({ notification }: { notification: AppNotification }) {
+  const actorName = getActorName(notification);
 
   return (
     <View style={styles.notificationItem}>
@@ -86,6 +87,26 @@ function NotificationItem({ notification }: { notification: MockNotification }) 
 }
 
 export default function NotificationsPage() {
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchNotificationsForUserTag('sozzzn')
+      .then((nextNotifications) => {
+        if (isMounted) {
+          setNotifications(nextNotifications);
+        }
+      })
+      .catch((error) => {
+        console.warn('[notifications] Failed to load notifications', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
@@ -103,9 +124,9 @@ export default function NotificationsPage() {
 
       <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {SECTION_ORDER.map((section) => {
-          const notifications = mockNotifications.filter((notification) => notification.section === section);
+          const sectionNotifications = notifications.filter((notification) => notification.section === section);
 
-          if (notifications.length === 0) {
+          if (sectionNotifications.length === 0) {
             return null;
           }
 
@@ -113,7 +134,7 @@ export default function NotificationsPage() {
             <View key={section} style={styles.section}>
               <Text style={styles.sectionTitle}>{SECTION_LABELS[section]}</Text>
               <View style={styles.sectionList}>
-                {notifications.map((notification) => (
+                {sectionNotifications.map((notification) => (
                   <NotificationItem key={notification.id} notification={notification} />
                 ))}
               </View>

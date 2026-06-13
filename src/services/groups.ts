@@ -59,7 +59,12 @@ export async function fetchGroupsWithMembers(): Promise<GroupWithMembers[]> {
     .returns<GroupRow[]>();
 
   if (error || !data) {
-    console.warn('[groups] Falling back to mock groups', error);
+    console.warn('[groups] Falling back to mock groups', {
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
+    });
     return fallbackGroupsWithMembers();
   }
 

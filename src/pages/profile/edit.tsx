@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -17,16 +17,41 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { background, darkGray, FontFamily, gray, white } from '@/constants/theme';
 import { mockUsers } from '@/src/mocks/users';
+import { AppUser, fetchUserByTag } from '@/src/services/users';
 
-const currentUser = mockUsers.find((user) => user.id === 'user-sohee') ?? mockUsers[0];
+const fallbackCurrentUser = mockUsers.find((user) => user.id === 'user-sohee') ?? mockUsers[0];
 const MAX_NICKNAME_LENGTH = 10;
 const MAX_TAG_LENGTH = 10;
 const MAX_DESCRIPTION_LENGTH = 100;
 
 export default function ProfileEditPage() {
-  const [nickname, setNickname] = useState(currentUser.name);
-  const [tag, setTag] = useState(currentUser.tag);
-  const [description, setDescription] = useState(currentUser.description);
+  const [currentUser, setCurrentUser] = useState<AppUser>(fallbackCurrentUser);
+  const [nickname, setNickname] = useState(fallbackCurrentUser.name);
+  const [tag, setTag] = useState(fallbackCurrentUser.tag);
+  const [description, setDescription] = useState(fallbackCurrentUser.description);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchUserByTag('sozzzn')
+      .then((user) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setCurrentUser(user);
+        setNickname(user.name);
+        setTag(user.tag);
+        setDescription(user.description);
+      })
+      .catch((error) => {
+        console.warn('[profile-edit] Failed to load profile', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
