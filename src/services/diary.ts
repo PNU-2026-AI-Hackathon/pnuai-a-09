@@ -11,6 +11,7 @@ type PostImageRow = {
 
 type DiaryPostRow = {
   id: string;
+  category: string | null;
   created_at: string;
   post_images: PostImageRow[];
 };
@@ -82,6 +83,7 @@ export async function fetchDiaryArchiveByUserTag(tag: string, year: number, mont
     .select(
       `
       id,
+      category,
       created_at,
       post_images (
         image_url,
@@ -123,8 +125,22 @@ export async function fetchDiaryArchiveByUserTag(tag: string, year: number, mont
   });
 
   const entries = [...entriesByDay.values()];
-  const postsWithImages = posts.filter((post) => post.post_images.length > 0);
-  const firstImage = getPostImageSource(postsWithImages[0]?.post_images[0]?.image_url ?? null);
+  const categoriesByName = new Map<string, DiaryMockCategory>();
+
+  posts.forEach((post) => {
+    const title = post.category?.trim() || '미분류';
+    const categoryId = title.toLowerCase().replace(/\s+/g, '-');
+    const sortedImages = [...post.post_images].sort((a, b) => a.sort_order - b.sort_order);
+    const image = getPostImageSource(sortedImages[0]?.image_url ?? null);
+    const current = categoriesByName.get(title);
+
+    categoriesByName.set(title, {
+      id: current?.id ?? categoryId,
+      title,
+      postCount: (current?.postCount ?? 0) + 1,
+      image: current?.image ?? image,
+    });
+  });
 
   return {
     entries,
@@ -133,19 +149,9 @@ export async function fetchDiaryArchiveByUserTag(tag: string, year: number, mont
         id: 'all',
         title: '전체',
         postCount: posts.length,
-        image: firstImage,
+        image: [...categoriesByName.values()].find((category) => category.image)?.image,
       },
-      {
-        id: 'photo',
-        title: '사진',
-        postCount: postsWithImages.length,
-        image: firstImage,
-      },
-      {
-        id: 'text',
-        title: '텍스트',
-        postCount: posts.length - postsWithImages.length,
-      },
+      ...categoriesByName.values(),
     ],
   };
 }
