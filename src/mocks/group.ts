@@ -1,17 +1,20 @@
-export type GroupFriend = {
+import { mockUsers } from '@/src/mocks/users';
+
+export type Group = {
+  id: string;
   name: string;
-  description: string;
-  friends_count: number;
-  like_count: number;
-  post_count: number;
+  memberIds: string[];
 };
 
-export const mockGroupFriends: GroupFriend[] = [
+export const mockGroups: Group[] = [
   {
-    name: '태란',
-    description: '저에 대한 객관적인 비평 또는 피드백 그런거 원치 않습니다... 일방적이고 편향적인 칭찬 부탁드립니다',
-    friends_count: 12,
-    like_count: 60,
-    post_count: 32,
+    id: 'group-praise-prison',
+    name: '정컴칭찬감옥방',
+    memberIds: mockUsers.map((user) => user.id),
+  },
+  {
+    id: 'group-2',
+    name: 'Group2',
+    memberIds: ['user-hyemin', 'user-jihyun'],
   },
 ];

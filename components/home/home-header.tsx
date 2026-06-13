@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useSegments } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
-import {background, darkGray, FontFamily, primary, white} from '@/constants/theme';
+import { background, darkGray, FontFamily, primary, white } from '@/constants/theme';
+import { useGroupSelection } from '@/src/contexts/group-selection';
 
 function Segment({
   label,
@@ -28,6 +30,8 @@ function Segment({
 export function HomeHeader() {
   const router = useRouter();
   const segments = useSegments();
+  const { groups, selectedGroup, selectedGroupId, setSelectedGroupId } = useGroupSelection();
+  const [isGroupMenuOpen, setIsGroupMenuOpen] = useState(false);
   const leaf = segments[segments.length - 1];
   const active: 'feed' | 'group' = leaf === 'group' ? 'group' : 'feed';
 
@@ -37,6 +41,11 @@ export function HomeHeader() {
       return;
     }
     router.replace('/(tabs)/home/group');
+  };
+
+  const selectGroup = (groupId: string) => {
+    setSelectedGroupId(groupId);
+    setIsGroupMenuOpen(false);
   };
 
   return (
@@ -65,11 +74,43 @@ export function HomeHeader() {
           <Segment label="피드" selected={active === 'feed'} onPress={() => go('feed')} />
         </View>
       </View>
-      <Pressable style={styles.groupTitleRow} accessibilityRole="button">
-        <SmallWhaleIcon size={22} />
-        <Text style={styles.groupTitle}>정컴칭찬감옥방</Text>
-        <Ionicons name="chevron-down" size={18} color={primary} />
-      </Pressable>
+      <View style={styles.groupSelector}>
+        <Pressable
+          style={styles.groupTitleRow}
+          accessibilityRole="button"
+          accessibilityLabel="그룹 선택"
+          accessibilityState={{ expanded: isGroupMenuOpen }}
+          onPress={() => setIsGroupMenuOpen((open) => !open)}>
+          <SmallWhaleIcon size={22} />
+          <Text style={styles.groupTitle}>{selectedGroup.name}</Text>
+          <Ionicons name={isGroupMenuOpen ? 'chevron-up' : 'chevron-down'} size={18} color={primary} />
+        </Pressable>
+        {isGroupMenuOpen ? (
+          <View style={styles.groupMenu}>
+            {groups.map((group) => {
+              const selected = group.id === selectedGroupId;
+
+              return (
+                <Pressable
+                  key={group.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${group.name} 그룹 선택`}
+                  onPress={() => selectGroup(group.id)}
+                  style={({ pressed }) => [
+                    styles.groupMenuItem,
+                    selected && styles.groupMenuItemSelected,
+                    pressed && styles.groupMenuItemPressed,
+                  ]}>
+                  <SmallWhaleIcon size={20} />
+                  <Text style={[styles.groupMenuText, selected && styles.groupMenuTextSelected]} numberOfLines={1}>
+                    {group.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -81,6 +122,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 12,
     backgroundColor: background,
+    zIndex: 10,
   },
   iconsRow: {
     flexDirection: 'row',
@@ -121,16 +163,57 @@ const styles = StyleSheet.create({
   iconHit: {
     padding: 4,
   },
+  groupSelector: {
+    alignSelf: 'flex-start',
+    position: 'relative',
+    zIndex: 20,
+  },
   groupTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-start',
-      paddingTop: 8
+    paddingTop: 8,
   },
   groupTitle: {
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 14,
+    color: primary,
+  },
+  groupMenu: {
+    position: 'absolute',
+    top: 40,
+    left: -6,
+    width: 182,
+    overflow: 'hidden',
+    borderRadius: 6,
+    backgroundColor: white,
+    shadowColor: '#3C4446',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  groupMenuItem: {
+    height: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+  },
+  groupMenuItemSelected: {
+    backgroundColor: '#D4F1FF',
+  },
+  groupMenuItemPressed: {
+    opacity: 0.72,
+  },
+  groupMenuText: {
+    flex: 1,
+    color: primary,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  groupMenuTextSelected: {
     color: primary,
   },
 });

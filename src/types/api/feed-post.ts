@@ -11,6 +11,7 @@ export type FeedComment = {
 /** 피드 게시글 */
 export type FeedPost = {
   id: string;
+  user_id: string;
   profile_image_url: string | null;
   username: string;
   /** 표시용 날짜 (예: 2026.04.26) — username 오른쪽 */

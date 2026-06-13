@@ -20,8 +20,9 @@ export type DiaryMockCategory = {
 export const mockPosts: FeedPost[] = [
   {
     id: 'post-1',
+    user_id: 'user-sohee',
     profile_image_url: null,
-    username: '소히._.',
+    username: '소희',
     created_at: '2026.04.26',
     relative_time: '30분전',
     image_url: ['', '', ''],
@@ -38,7 +39,7 @@ export const mockPosts: FeedPost[] = [
           {
             user_id: 'user-sohee',
             profile_image_url: null,
-            username: '소희._.',
+            username: '소희',
             content: '완저니 갓생이다><',
             is_author: true,
           },
@@ -54,6 +55,7 @@ export const mockPosts: FeedPost[] = [
   },
   {
     id: 'post-2',
+    user_id: 'user-jihyun',
     profile_image_url: null,
     username: '지현',
     created_at: '2026.04.25',
