@@ -187,11 +187,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 6,
     backgroundColor: white,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowColor: '#3C4446',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   groupMenuItem: {
     height: 36,
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   groupMenuItemSelected: {
-    backgroundColor: '#CDEEFF',
+    backgroundColor: '#D4F1FF',
   },
   groupMenuItemPressed: {
     opacity: 0.72,
@@ -214,6 +214,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   groupMenuTextSelected: {
-    color: '#39B6F0',
+    color: primary,
   },
 });

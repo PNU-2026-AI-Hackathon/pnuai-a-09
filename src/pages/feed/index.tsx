@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useGroupSelection } from '@/src/contexts/group-selection';
 import { mockPosts } from '@/src/mocks/posts';
 import type { FeedPost } from '@/src/types/api/feed-post';
 
@@ -18,6 +20,11 @@ const FAB_GAP_ABOVE_TAB = -80;
 export default function FeedPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { selectedGroup } = useGroupSelection();
+  const groupPosts = useMemo(
+    () => mockPosts.filter((post) => selectedGroup.memberIds.includes(post.user_id)),
+    [selectedGroup],
+  );
 
   const renderItem: ListRenderItem<FeedPost> = ({ item }) => <FeedPostCard post={item} />;
 
@@ -27,7 +34,7 @@ export default function FeedPage() {
   return (
     <View style={styles.screen}>
       <FlatList
-        data={mockPosts}
+        data={groupPosts}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad }]}
