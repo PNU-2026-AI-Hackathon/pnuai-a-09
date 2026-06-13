@@ -1,14 +1,14 @@
 import { Image } from 'expo-image';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
 import { background, darkGray, FontFamily, primary, white } from '@/constants/theme';
 import type { GroupFriend } from '@/src/mocks/group';
 import { mockGroupFriends } from '@/src/mocks/group';
 
-const whaleBackground = require('../../../assets/video/whale_background.mp4');
+const groupBackground = require('../../../assets/icons/group_background.png');
 const whaleCharacter = require('../../../assets/icons/whale_moving.png');
 const whaleGradation = require('../../../assets/icons/gradation.png');
 const noop = () => undefined;
@@ -85,152 +85,118 @@ function FloatingWhale({ size }: { size: 'group' | 'profile' }) {
   );
 }
 
-function VideoLightOverlay() {
-  return (
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        {/* 1층 & 2층: 전체를 부드럽게 감싸는 화이트 워시와 청량한 파란색 틴트 */}
-        <View style={styles.lightWash} />
-        <View style={styles.blueTint} />
-
-        {/* 3층: 상단면을 자연스럽게 빡세게 가려주는 그라데이션 */}
-        <Svg style={styles.topGradient} width="100%" height="100%" viewBox="0 0 375 360" preserveAspectRatio="none">
-          <Defs>
-            <LinearGradient id="topWhiteFade" x1="187.5" y1="0" x2="187.5" y2="120" gradientUnits="userSpaceOnUse">
-              <Stop offset="0" stopColor={background} stopOpacity="1" />
-              <Stop offset="0.15" stopColor="#FFFFFF" stopOpacity="0.85" />
-              <Stop offset="0.7" stopColor="#FFFFFF" stopOpacity="0.3" />
-              <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="375" height="360" fill="url(#topWhiteFade)" />
-        </Svg>
-      </View>
-  );
-}
-
 export default function GroupPage() {
   const [selectedFriend, setSelectedFriend] = useState<GroupFriend | null>(null);
-  const player = useVideoPlayer(whaleBackground, (videoPlayer) => {
-    videoPlayer.loop = true;
-    videoPlayer.muted = true;
-    videoPlayer.play();
-  });
 
   return (
-    <View style={styles.screen}>
-      <VideoView
-        player={player}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        nativeControls={false}
-      />
-      <VideoLightOverlay />
-      <View style={styles.memberList}>
-        {mockGroupFriends.map((friend) => (
-          <Pressable
-            key={friend.name}
-            accessibilityRole="button"
-            accessibilityLabel={`${friend.name} 프로필 보기`}
-            onPress={() => setSelectedFriend(friend)}
-            style={({ pressed }) => [styles.memberItem, pressed && styles.memberItemPressed]}>
-            <View style={styles.characterStack}>
-              <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
-              <FloatingWhale size="group" />
-            </View>
-            <Text style={styles.characterName}>{friend.name}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Modal
-        visible={selectedFriend !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedFriend(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.profileCard}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.screen}>
+        <Image
+          source={groupBackground}
+          style={styles.backgroundImage}
+          contentFit="cover"
+        />
+        <View style={styles.memberList}>
+          {mockGroupFriends.map((friend) => (
             <Pressable
+              key={friend.name}
               accessibilityRole="button"
-              accessibilityLabel="프로필 닫기"
-              onPress={() => setSelectedFriend(null)}
-              hitSlop={8}
-              style={styles.closeButton}>
-              <CloseIcon />
-            </Pressable>
-            {selectedFriend ? (
-              <View style={styles.profileContent}>
-                <View style={styles.profileLeft}>
-                  <View style={styles.profileImageStack}>
-                    <Image source={whaleGradation} style={styles.profileGradation} contentFit="contain" />
-                    <FloatingWhale size="profile" />
-                  </View>
-                  <Pressable accessibilityRole="button" onPress={noop} style={styles.visitButton}>
-                    <Text style={styles.visitButtonText}>방문하기</Text>
-                  </Pressable>
-                </View>
-
-                <View style={styles.profileRight}>
-                  <Text style={styles.profileName} numberOfLines={1}>
-                    {selectedFriend.name}
-                  </Text>
-                  <Text style={styles.profileDescription} numberOfLines={3}>
-                    {selectedFriend.description}
-                  </Text>
-                  <View style={styles.statRow}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{selectedFriend.friends_count}</Text>
-                      <Text style={styles.statLabel}>Friends</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{selectedFriend.like_count}</Text>
-                      <Text style={styles.statLabel}>Like</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{selectedFriend.post_count}</Text>
-                      <Text style={styles.statLabel}>Post</Text>
-                    </View>
-                  </View>
-                </View>
+              accessibilityLabel={`${friend.name} 프로필 보기`}
+              onPress={() => setSelectedFriend(friend)}
+              style={({ pressed }) => [styles.memberItem, pressed && styles.memberItemPressed]}>
+              <View style={styles.characterStack}>
+                <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
+                <FloatingWhale size="group" />
               </View>
-            ) : null}
+              <Text style={styles.characterName}>{friend.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Modal
+          visible={selectedFriend !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setSelectedFriend(null)}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.profileCard}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="프로필 닫기"
+                onPress={() => setSelectedFriend(null)}
+                hitSlop={8}
+                style={styles.closeButton}>
+                <CloseIcon />
+              </Pressable>
+              {selectedFriend ? (
+                <View style={styles.profileContent}>
+                  <View style={styles.profileLeft}>
+                    <View style={styles.profileImageStack}>
+                      <Image source={whaleGradation} style={styles.profileGradation} contentFit="contain" />
+                      <FloatingWhale size="profile" />
+                    </View>
+                    <Pressable accessibilityRole="button" onPress={noop} style={styles.visitButton}>
+                      <Text style={styles.visitButtonText}>방문하기</Text>
+                    </Pressable>
+                  </View>
+
+                  <View style={styles.profileRight}>
+                    <Text style={styles.profileName} numberOfLines={1}>
+                      {selectedFriend.name}
+                    </Text>
+                    <Text style={styles.profileDescription} numberOfLines={3}>
+                      {selectedFriend.description}
+                    </Text>
+                    <View style={styles.statRow}>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{selectedFriend.friends_count}</Text>
+                        <Text style={styles.statLabel}>Friends</Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{selectedFriend.like_count}</Text>
+                        <Text style={styles.statLabel}>Like</Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{selectedFriend.post_count}</Text>
+                        <Text style={styles.statLabel}>Post</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+            </View>
           </View>
-        </View>
-      </Modal>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="친구초대"
-        onPress={noop}
-        style={({ pressed }) => [styles.inviteButton, pressed && styles.inviteButtonPressed]}>
-        <Text style={styles.inviteText}>친구초대</Text>
-        <View style={styles.inviteIcon}>
-          <PlusIcon />
-        </View>
-      </Pressable>
-    </View>
+        </Modal>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="친구초대"
+          onPress={noop}
+          style={({ pressed }) => [styles.inviteButton, pressed && styles.inviteButtonPressed]}>
+          <Text style={styles.inviteText}>친구초대</Text>
+          <View style={styles.inviteIcon}>
+            <PlusIcon />
+          </View>
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: background,
+  },
   screen: {
     flex: 1,
     overflow: 'hidden',
     backgroundColor: background,
   },
-  blueTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#00A2FF',
-    opacity: 0.45,
-  },
-  lightWash: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: white,
-    opacity: 0.55,
-  },
-  topGradient: {
+  backgroundImage: {
     position: 'absolute',
-    top: 0,
-    left: 0,
+    top: 10,
     right: 0,
-    height: 360,
+    bottom: -10,
+    left: 0,
   },
   memberList: {
     position: 'absolute',
