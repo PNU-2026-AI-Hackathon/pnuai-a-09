@@ -55,6 +55,7 @@ export function HomeHeader() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="알림"
+            onPress={() => router.push('/(tabs)/home/notifications')}
             hitSlop={8}
             style={styles.iconHit}>
             <Ionicons name="notifications-outline" size={22} color={darkGray} />

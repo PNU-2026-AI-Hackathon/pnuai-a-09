@@ -1,4 +1,4 @@
-import { Slot } from 'expo-router';
+import { Slot, useSegments } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,11 +8,14 @@ import { GroupSelectionProvider } from '@/src/contexts/group-selection';
 
 export default function HomeLayout() {
   const insets = useSafeAreaInsets();
+  const segments = useSegments();
+  const leaf = segments[segments.length - 1];
+  const shouldShowHeader = leaf !== 'notifications';
 
   return (
     <GroupSelectionProvider>
       <View style={[styles.root, { paddingTop: insets.top }]}>
-        <HomeHeader />
+        {shouldShowHeader ? <HomeHeader /> : null}
         <View style={styles.stackWrap}>
           <Slot />
         </View>
