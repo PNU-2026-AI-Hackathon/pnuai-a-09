@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -10,10 +11,11 @@ import { PencilIcon } from '@/components/icons/pencil-icon';
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
 import {background, darkGray, FontFamily, gray, lightGray, primary, white} from '@/constants/theme';
 import { mockUsers } from '@/src/mocks/users';
+import { AppUser, fetchUserByTag } from '@/src/services/users';
 
 const whaleImage = require('../../../assets/icons/whale1.png');
 const friendsCheerImage = require('../../../assets/icons/friends_cheer.png');
-const currentUser = mockUsers.find((user) => user.id === 'user-sohee') ?? mockUsers[0];
+const fallbackCurrentUser = mockUsers.find((user) => user.id === 'user-sohee') ?? mockUsers[0];
 const NEXT_LEVEL_DAYS = 31;
 
 function getInstalledDays(installedAt: string) {
@@ -98,7 +100,26 @@ function StatCard({
 
 export default function ProfilePage() {
   const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<AppUser>(fallbackCurrentUser);
   const installedDays = getInstalledDays(currentUser.installed_at);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchUserByTag('sozzzn')
+      .then((user) => {
+        if (isMounted) {
+          setCurrentUser(user);
+        }
+      })
+      .catch((error) => {
+        console.warn('[profile] Failed to load user', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
