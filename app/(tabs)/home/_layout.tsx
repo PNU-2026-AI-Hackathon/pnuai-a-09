@@ -11,10 +11,11 @@ export default function HomeLayout() {
   const segments = useSegments();
   const leaf = segments[segments.length - 1];
   const shouldShowHeader = leaf !== 'notifications';
+  const topPadding = shouldShowHeader ? insets.top : 0;
 
   return (
     <GroupSelectionProvider>
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={[styles.root, { paddingTop: topPadding }]}>
         {shouldShowHeader ? <HomeHeader /> : null}
         <View style={styles.stackWrap}>
           <Slot />
