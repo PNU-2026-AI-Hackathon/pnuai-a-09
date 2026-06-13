@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, LayoutChangeEvent, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { background, darkGray, FontFamily, primary, white } from '@/constants/theme';
@@ -11,6 +11,60 @@ const groupBackground = require('../../../assets/icons/group_background.png');
 const whaleCharacter = require('../../../assets/icons/whale1.png');
 const whaleGradation = require('../../../assets/icons/gradation.png');
 const noop = () => undefined;
+const MEMBER_CARD_WIDTH = 123;
+const MEMBER_CARD_HEIGHT = 104;
+const BOUNCE_PADDING = {
+  top: 18,
+  right: 18,
+  bottom: 92,
+  left: 18,
+};
+
+type PlayArea = {
+  width: number;
+  height: number;
+};
+
+type WhaleMotion = {
+  position: Animated.ValueXY;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getMotionBounds(playArea: PlayArea) {
+  const minX = BOUNCE_PADDING.left;
+  const minY = BOUNCE_PADDING.top;
+  const maxX = Math.max(minX, playArea.width - BOUNCE_PADDING.right - MEMBER_CARD_WIDTH);
+  const maxY = Math.max(minY, playArea.height - BOUNCE_PADDING.bottom - MEMBER_CARD_HEIGHT);
+
+  return { minX, minY, maxX, maxY };
+}
+
+function createInitialMotion(index: number, playArea: PlayArea, position = new Animated.ValueXY()) {
+  const { minX, minY, maxX, maxY } = getMotionBounds(playArea);
+  const spanX = Math.max(1, maxX - minX);
+  const spanY = Math.max(1, maxY - minY);
+  const x = minX + ((index * 97) % spanX);
+  const y = minY + ((index * 67) % spanY);
+  const speedX = 18 + (index % 4) * 6;
+  const speedY = 14 + (index % 3) * 5;
+
+  position.setValue({ x, y });
+
+  return {
+    position,
+    x,
+    y,
+    vx: index % 2 === 0 ? speedX : -speedX,
+    vy: index % 3 === 0 ? speedY : -speedY,
+  };
+}
 
 function PlusIcon() {
   return (
@@ -86,9 +140,56 @@ function FloatingWhale() {
 
 export default function GroupPage() {
   const [selectedFriend, setSelectedFriend] = useState<GroupFriend | null>(null);
+  const [playArea, setPlayArea] = useState<PlayArea>({ width: 0, height: 0 });
+  const [whaleMotions, setWhaleMotions] = useState<Record<string, WhaleMotion>>({});
+  const animationFrameRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number | null>(null);
+
+  const handleScreenLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+
+    setPlayArea((current) => {
+      if (current.width === width && current.height === height) {
+        return current;
+      }
+
+      return { width, height };
+    });
+  };
+
+  useEffect(() => {
+    if (playArea.width <= 0 || playArea.height <= 0) {
+      return;
+    }
+
+    setWhaleMotions((current) => {
+      const next: Record<string, WhaleMotion> = {};
+      const { minX, minY, maxX, maxY } = getMotionBounds(playArea);
+
+      mockGroupFriends.forEach((friend, index) => {
+        const existing = current[friend.tag];
+
+        if (!existing) {
+          next[friend.tag] = createInitialMotion(index, playArea);
+          return;
+        }
+
+        const x = clamp(existing.x, minX, maxX);
+        const y = clamp(existing.y, minY, maxY);
+        existing.position.setValue({ x, y });
+        next[friend.tag] = {
+          ...existing,
+          x,
+          y,
+        };
+      });
+
+      return next;
+    });
+  }, [playArea]);
 
   return (
-    <View style={styles.screen}>
+    <View style={styles.screen} onLayout={handleScreenLayout}>
       <Image
         source={groupBackground}
         style={styles.backgroundImage}
