@@ -13,7 +13,8 @@ import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import { background, darkGray, FontFamily, FontSize, gray, lightGray, primary, white } from '@/constants/theme';
 import { mockDiaryCategories, mockDiaryEntries } from '@/src/mocks/posts';
-import { fetchDiaryArchiveByUserTag } from '@/src/services/diary';
+import { fetchDiaryArchiveByUserId } from '@/src/services/diary';
+import { fetchCurrentUser } from '@/src/services/users';
 
 const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTH_LABELS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -84,9 +85,16 @@ export default function DiaryPage() {
     setFailedDiaryImages({});
     setFailedCategoryImages({});
 
-    fetchDiaryArchiveByUserTag('sozzzn', selectedYear, selectedMonth)
+    fetchCurrentUser()
+      .then((user) => {
+        if (!isMounted || !user) {
+          return;
+        }
+
+        return fetchDiaryArchiveByUserId(user.id, selectedYear, selectedMonth);
+      })
       .then((archive) => {
-        if (!isMounted) {
+        if (!isMounted || !archive) {
           return;
         }
 

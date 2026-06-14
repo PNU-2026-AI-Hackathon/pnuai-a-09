@@ -8,7 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
 import type { MockNotification } from '@/src/mocks/notifications';
 import { mockUsers } from '@/src/mocks/users';
-import { AppNotification, fetchNotificationsForUserTag } from '@/src/services/notifications';
+import { AppNotification, fetchNotificationsForUserId } from '@/src/services/notifications';
+import { fetchCurrentUser } from '@/src/services/users';
 
 const SECTION_LABELS: Record<MockNotification['section'], string> = {
   today: '오늘',
@@ -92,11 +93,20 @@ export default function NotificationsPage() {
   useEffect(() => {
     let isMounted = true;
 
-    fetchNotificationsForUserTag('sozzzn')
-      .then((nextNotifications) => {
-        if (isMounted) {
-          setNotifications(nextNotifications);
+    fetchCurrentUser()
+      .then((user) => {
+        if (!isMounted || !user) {
+          return [];
         }
+
+        return fetchNotificationsForUserId(user.id);
+      })
+      .then((nextNotifications) => {
+        if (!isMounted || !nextNotifications) {
+          return;
+        }
+
+        setNotifications(nextNotifications);
       })
       .catch((error) => {
         console.warn('[notifications] Failed to load notifications', error);

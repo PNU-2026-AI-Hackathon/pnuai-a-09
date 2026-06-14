@@ -31,12 +31,14 @@ export const mockPosts: FeedPost[] = [
     like_count: 5,
     comments: [
       {
+        id: 'comment-1',
         user_id: 'user-hyemin',
         profile_image_url: null,
         username: '혜민',
         content: '완저니 갓생이다><',
         replies: [
           {
+            id: 'comment-1-reply-1',
             user_id: 'user-sohee',
             profile_image_url: null,
             username: '소희',
@@ -46,6 +48,7 @@ export const mockPosts: FeedPost[] = [
         ],
       },
       {
+        id: 'comment-2',
         user_id: 'user-sohee',
         profile_image_url: null,
         username: '소희',
@@ -65,6 +68,7 @@ export const mockPosts: FeedPost[] = [
     like_count: 12,
     comments: [
       {
+        id: 'comment-3',
         user_id: 'user-taeran',
         profile_image_url: null,
         username: '태란',

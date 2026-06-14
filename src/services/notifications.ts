@@ -85,33 +85,7 @@ function getSection(value: string): MockNotification['section'] {
   return 'last_week';
 }
 
-export async function fetchNotificationsForUserTag(tag: string): Promise<AppNotification[]> {
-  const { data: recipient, error: recipientError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('tag', tag)
-    .maybeSingle<{ id: string }>();
-
-  let recipientId = recipient?.id;
-
-  if (recipientError || !recipientId) {
-    const { data: firstProfile, error: firstProfileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .limit(1)
-      .single<{ id: string }>();
-
-    if (firstProfileError || !firstProfile) {
-      console.warn('[notifications] Failed to load recipient profile', {
-        recipientError,
-        firstProfileError,
-      });
-      return [];
-    }
-
-    recipientId = firstProfile.id;
-  }
-
+export async function fetchNotificationsForUserId(recipientId: string): Promise<AppNotification[]> {
   const { data: notifications, error: notificationsError } = await supabase
     .from('notifications')
     .select('id, type, actor_user_id, post_id, post_image_url, comment_content, is_read, created_at')
@@ -162,4 +136,19 @@ export async function fetchNotificationsForUserTag(tag: string): Promise<AppNoti
       isNew: !notification.is_read,
     };
   });
+}
+
+export async function fetchNotificationsForUserTag(tag: string): Promise<AppNotification[]> {
+  const { data: recipient, error: recipientError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('tag', tag)
+    .maybeSingle<{ id: string }>();
+
+  if (recipientError || !recipient?.id) {
+    console.warn('[notifications] Failed to load recipient profile', recipientError);
+    return [];
+  }
+
+  return fetchNotificationsForUserId(recipient.id);
 }

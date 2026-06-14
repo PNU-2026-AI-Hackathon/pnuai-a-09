@@ -53,30 +53,7 @@ function fallbackArchive(): DiaryArchive {
   };
 }
 
-export async function fetchDiaryArchiveByUserTag(tag: string, year: number, month: number): Promise<DiaryArchive> {
-  const { data: user, error: userError } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('tag', tag)
-    .maybeSingle<{ id: string }>();
-
-  let userId = user?.id;
-
-  if (userError || !userId) {
-    const { data: firstUser, error: firstUserError } = await supabase
-      .from('profiles')
-      .select('id')
-      .limit(1)
-      .single<{ id: string }>();
-
-    if (firstUserError || !firstUser) {
-      console.warn('[diary] Falling back to mock archive: profile lookup failed', userError ?? firstUserError);
-      return fallbackArchive();
-    }
-
-    userId = firstUser.id;
-  }
-
+export async function fetchDiaryArchiveByUserId(userId: string, year: number, month: number): Promise<DiaryArchive> {
   const { start, end } = getMonthRange(year, month);
   const { data: posts, error: postsError } = await supabase
     .from('posts')
@@ -98,7 +75,7 @@ export async function fetchDiaryArchiveByUserTag(tag: string, year: number, mont
     .returns<DiaryPostRow[]>();
 
   if (postsError || !posts) {
-    console.warn('[diary] Falling back to mock archive', {
+    console.warn('[diary] Failed to load archive', {
       code: postsError?.code,
       message: postsError?.message,
       details: postsError?.details,
@@ -154,4 +131,19 @@ export async function fetchDiaryArchiveByUserTag(tag: string, year: number, mont
       ...categoriesByName.values(),
     ],
   };
+}
+
+export async function fetchDiaryArchiveByUserTag(tag: string, year: number, month: number): Promise<DiaryArchive> {
+  const { data: user, error: userError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('tag', tag)
+    .maybeSingle<{ id: string }>();
+
+  if (userError || !user?.id) {
+    console.warn('[diary] Profile lookup failed', userError);
+    return fallbackArchive();
+  }
+
+  return fetchDiaryArchiveByUserId(user.id, year, month);
 }
