@@ -4,7 +4,7 @@
     "slug": "whale-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/icons/whale1.png",
     "scheme": "whaleapp",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -19,9 +19,9 @@
       "package": "com.whaledone.myapp",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/icons/whale1.png",
+        "backgroundImage": "./assets/icons/whale1.png",
+        "monochromeImage": "./assets/icons/whale1.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false

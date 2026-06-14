@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   ImageStyle,
   ImageSourcePropType,
@@ -12,15 +14,83 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { login } from '@react-native-seoul/kakao-login';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {FontFamily, gray} from "@/constants/theme";
+import { supabase } from '@/src/lib/supabase';
+
+type KakaoLoginToken = {
+  idToken?: string;
+  id_token?: string;
+};
 
 export default function RootIndex() {
   const { width } = useWindowDimensions();
   const backgroundHeight = width * (1024 / 780);
+  const [isKakaoLoading, setIsKakaoLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const handleStart = () => {
-    router.replace('/home');
+    router.push({
+      pathname: '/onboarding/terms',
+      params: {
+        // TODO: Replace with Apple user nickname/profile image after Apple login is connected.
+        nickname: '',
+        profileImage: '',
+      },
+    });
+  };
+
+  const handleKakaoLogin = async () => {
+    if (isKakaoLoading) {
+      return;
+    }
+
+    setIsKakaoLoading(true);
+    setLoginError(null);
+
+    try {
+      const kakaoToken = (await login()) as KakaoLoginToken;
+      const idToken = kakaoToken.idToken ?? kakaoToken.id_token;
+
+      if (!idToken) {
+        throw new Error('카카오 로그인 결과에서 id_token을 찾을 수 없습니다.');
+      }
+
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'kakao',
+        token: idToken,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const nickname =
+        data.user?.user_metadata?.profile_nickname ??
+        data.user?.user_metadata?.nickname ??
+        data.user?.user_metadata?.name ??
+        '';
+      const profileImage =
+        data.user?.user_metadata?.profile_image ??
+        data.user?.user_metadata?.avatar_url ??
+        data.user?.user_metadata?.picture ??
+        '';
+
+      // TODO: After onboarding tables are ready, route existing completed users directly to /home.
+      router.replace({
+        pathname: '/onboarding/terms',
+        params: {
+          nickname,
+          profileImage,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '카카오 로그인 중 문제가 발생했습니다.';
+      setLoginError(message);
+    } finally {
+      setIsKakaoLoading(false);
+    }
   };
 
   return (
@@ -45,7 +115,9 @@ export default function RootIndex() {
             style={styles.kakaoButton}
             textStyle={styles.kakaoText}
             iconStyle={styles.kakaoIcon}
-            onPress={handleStart}
+            onPress={handleKakaoLogin}
+            loading={isKakaoLoading}
+            disabled={isKakaoLoading}
           />
           <SocialLoginButton
             label="Apple로 시작하기"
@@ -54,7 +126,9 @@ export default function RootIndex() {
             textStyle={styles.appleText}
             iconStyle={styles.appleIcon}
             onPress={handleStart}
+            disabled={isKakaoLoading}
           />
+          {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
         </View>
       </SafeAreaView>
     </View>
@@ -68,6 +142,8 @@ type SocialLoginButtonProps = {
   textStyle: TextStyle;
   iconStyle: ImageStyle;
   onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
 };
 
 function SocialLoginButton({
@@ -77,14 +153,21 @@ function SocialLoginButton({
   textStyle,
   iconStyle,
   onPress,
+  loading = false,
+  disabled = false,
 }: SocialLoginButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.loginButton, style, pressed && styles.pressed]}>
-      <Image source={icon} style={[styles.loginIcon, iconStyle]} resizeMode="contain" />
+      style={({ pressed }) => [styles.loginButton, style, disabled && styles.disabled, pressed && styles.pressed]}>
+      {loading ? (
+        <ActivityIndicator color="#000000" size="small" style={styles.loginIcon} />
+      ) : (
+        <Image source={icon} style={[styles.loginIcon, iconStyle]} resizeMode="contain" />
+      )}
       <Text style={[styles.buttonText, textStyle]}>{label}</Text>
     </Pressable>
   );
@@ -150,6 +233,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.82,
   },
+  disabled: {
+    opacity: 0.6,
+  },
   loginIcon: {
     marginRight: 10
   },
@@ -172,5 +258,14 @@ const styles = StyleSheet.create({
   },
   appleText: {
     color: '#FFFFFF',
+  },
+  errorText: {
+    maxWidth: 272,
+    marginTop: 4,
+    color: '#D04444',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
 });
