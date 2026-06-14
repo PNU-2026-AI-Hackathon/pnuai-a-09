@@ -226,7 +226,12 @@ function mapPost(row: PostRow, likedPostIds: Set<string>, likeStatsByCommentId: 
   };
 }
 
-export async function createComment(postId: string, content: string, postAuthorId: string): Promise<FeedComment> {
+export async function createComment(
+  postId: string,
+  content: string,
+  postAuthorId: string,
+  parentCommentId?: string | null,
+): Promise<FeedComment> {
   const trimmedContent = content.trim();
   if (!trimmedContent) {
     throw new Error('댓글 내용을 입력해 주세요.');
@@ -247,7 +252,7 @@ export async function createComment(postId: string, content: string, postAuthorI
       post_id: postId,
       user_id: user.id,
       content: trimmedContent,
-      parent_comment_id: null,
+      parent_comment_id: parentCommentId ?? null,
     })
     .select(
       `

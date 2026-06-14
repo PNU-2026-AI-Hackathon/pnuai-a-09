@@ -94,16 +94,37 @@ function updateCommentInTree(
   });
 }
 
+function appendReplyToComment(
+  comments: FeedComment[],
+  parentCommentId: string,
+  reply: FeedComment,
+): FeedComment[] {
+  return comments.map((comment) => {
+    if (comment.id === parentCommentId) {
+      return {
+        ...comment,
+        replies: [...(comment.replies ?? []), reply],
+      };
+    }
+
+    return comment;
+  });
+}
+
 function CommentItem({
   comment,
   isReply = false,
   onToggleLike,
+  onReply,
   isLikePending = false,
+  isReplyTarget = false,
 }: {
   comment: FeedComment;
   isReply?: boolean;
   onToggleLike: (commentId: string) => void;
+  onReply?: (comment: FeedComment) => void;
   isLikePending?: boolean;
+  isReplyTarget?: boolean;
 }) {
   const isLiked = comment.is_liked ?? false;
 
@@ -116,9 +137,15 @@ function CommentItem({
           {comment.is_author ? <Text style={styles.authorBadge}>작성자</Text> : null}
         </View>
         <Text style={styles.sheetCommentText}>{comment.content}</Text>
-        <Pressable accessibilityRole="button" hitSlop={8}>
-          <Text style={styles.replyText}>Reply</Text>
-        </Pressable>
+        {!isReply && onReply ? (
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => onReply(comment)}
+            style={({ pressed }) => pressed && styles.pressed}>
+            <Text style={[styles.replyText, isReplyTarget && styles.replyTextActive]}>Reply</Text>
+          </Pressable>
+        ) : null}
       </View>
       <Pressable
         accessibilityRole="button"
@@ -144,10 +171,17 @@ export function FeedPostCard({ post }: Props) {
   const [isPostLikePending, setIsPostLikePending] = useState(false);
   const [pendingLikeCommentId, setPendingLikeCommentId] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
   const sheetProgress = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
+  const commentInputRef = useRef<TextInput>(null);
   const commentCount = useMemo(() => getCommentCount(localComments), [localComments]);
-  const closeComments = useCallback(() => setIsCommentsOpen(false), []);
+  const closeComments = useCallback(() => {
+    setIsCommentsOpen(false);
+    setReplyingTo(null);
+    setDraftComment('');
+    setCommentError(null);
+  }, []);
 
   useEffect(() => {
     setLocalComments(post.comments);
@@ -230,18 +264,33 @@ export function FeedPostCard({ post }: Props) {
   });
   const draggedSheetTranslateY = Animated.add(sheetTranslateY, dragY);
 
+  const handleReply = useCallback((comment: FeedComment) => {
+    setReplyingTo({ id: comment.id, username: comment.username });
+    setCommentError(null);
+    commentInputRef.current?.focus();
+  }, []);
+
   const submitComment = async () => {
     const content = draftComment.trim();
     if (!content || isSubmittingComment) {
       return;
     }
 
+    const parentCommentId = replyingTo?.id ?? null;
+
     setIsSubmittingComment(true);
     setCommentError(null);
 
     try {
-      const createdComment = await createComment(post.id, content, post.user_id);
-      setLocalComments((prev) => [...prev, createdComment]);
+      const createdComment = await createComment(post.id, content, post.user_id, parentCommentId);
+
+      if (parentCommentId) {
+        setLocalComments((prev) => appendReplyToComment(prev, parentCommentId, createdComment));
+      } else {
+        setLocalComments((prev) => [...prev, createdComment]);
+      }
+
+      setReplyingTo(null);
       setDraftComment('');
     } catch (error) {
       const message = error instanceof Error ? error.message : '댓글 등록에 실패했습니다.';
@@ -419,7 +468,9 @@ export function FeedPostCard({ post }: Props) {
                   <CommentItem
                     comment={comment}
                     onToggleLike={handleToggleCommentLike}
+                    onReply={handleReply}
                     isLikePending={pendingLikeCommentId === comment.id}
+                    isReplyTarget={replyingTo?.id === comment.id}
                   />
                   {comment.replies?.map((reply) => (
                     <CommentItem
@@ -436,11 +487,27 @@ export function FeedPostCard({ post }: Props) {
             </ScrollView>
 
             <View style={styles.commentInputBar}>
+              {replyingTo ? (
+                <View style={styles.replyingBar}>
+                  <Text style={styles.replyingText} numberOfLines={1}>
+                    {replyingTo.username}님에게 답글
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="답글 취소"
+                    hitSlop={8}
+                    onPress={() => setReplyingTo(null)}
+                    style={({ pressed }) => [styles.replyingCancel, pressed && styles.pressed]}>
+                    <Ionicons name="close" size={16} color={gray} />
+                  </Pressable>
+                </View>
+              ) : null}
               <View style={styles.commentInputPill}>
                 <TextInput
+                  ref={commentInputRef}
                   value={draftComment}
                   onChangeText={setDraftComment}
-                  placeholder="댓글 남기기"
+                  placeholder={replyingTo ? '답글 남기기' : '댓글 남기기'}
                   placeholderTextColor="#B1B1B1"
                   style={styles.commentInput}
                   returnKeyType="send"
@@ -728,6 +795,32 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.pretendardMedium,
     fontSize: 12,
     lineHeight: 16,
+  },
+  replyTextActive: {
+    color: primary,
+  },
+  replyingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  replyingText: {
+    flex: 1,
+    color: gray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  replyingCancel: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.7,
   },
   commentLikeButton: {
     width: 36,
