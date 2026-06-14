@@ -1,6 +1,4 @@
 import { supabase } from '@/src/lib/supabase';
-import { Group, mockGroups } from '@/src/mocks/group';
-import { mockUsers } from '@/src/mocks/users';
 import type { AppUser } from '@/src/services/users';
 import { mapUserRowToAppUser } from '@/src/services/users';
 
@@ -21,6 +19,12 @@ type GroupRow = {
   id: string;
   name: string;
   group_members: GroupMemberRow[];
+};
+
+export type Group = {
+  id: string;
+  name: string;
+  memberIds: string[];
 };
 
 export type GroupWithMembers = Group & {
@@ -48,13 +52,6 @@ function mapGroupRows(data: GroupRow[]): GroupWithMembers[] {
       members,
     };
   });
-}
-
-function fallbackGroupsWithMembers(): GroupWithMembers[] {
-  return mockGroups.map((group) => ({
-    ...group,
-    members: mockUsers.filter((user) => group.memberIds.includes(user.id)),
-  }));
 }
 
 export async function fetchGroupsWithMembersForUser(userId: string): Promise<GroupWithMembers[]> {
@@ -140,13 +137,13 @@ export async function fetchGroupsWithMembers(): Promise<GroupWithMembers[]> {
     .returns<GroupRow[]>();
 
   if (error || !data) {
-    console.warn('[groups] Falling back to mock groups', {
+    console.warn('[groups] Failed to load groups', {
       code: error?.code,
       message: error?.message,
       details: error?.details,
       hint: error?.hint,
     });
-    return fallbackGroupsWithMembers();
+    return [];
   }
 
   return data.map((group) => {

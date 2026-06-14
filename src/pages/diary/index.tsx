@@ -12,8 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import { background, darkGray, FontFamily, FontSize, gray, lightGray, primary, white } from '@/constants/theme';
-import { mockDiaryCategories, mockDiaryEntries } from '@/src/mocks/posts';
-import { fetchDiaryArchiveByUserId } from '@/src/services/diary';
+import { fetchDiaryArchiveByUserId, type DiaryCategory, type DiaryEntry } from '@/src/services/diary';
 import { fetchCurrentUser } from '@/src/services/users';
 
 const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -73,8 +72,8 @@ export default function DiaryPage() {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [failedDiaryImages, setFailedDiaryImages] = useState<Record<number, boolean>>({});
   const [failedCategoryImages, setFailedCategoryImages] = useState<Record<string, boolean>>({});
-  const [diaryEntries, setDiaryEntries] = useState(mockDiaryEntries);
-  const [diaryCategories, setDiaryCategories] = useState(mockDiaryCategories);
+  const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
+  const [diaryCategories, setDiaryCategories] = useState<DiaryCategory[]>([]);
 
   const weeks = useMemo(() => getCalendarWeeks(selectedYear, selectedMonth), [selectedMonth, selectedYear]);
   const entriesByDay = useMemo(() => new Map(diaryEntries.map((entry) => [entry.day, entry])), [diaryEntries]);
@@ -82,13 +81,15 @@ export default function DiaryPage() {
   useEffect(() => {
     let isMounted = true;
 
+    setDiaryEntries([]);
+    setDiaryCategories([]);
     setFailedDiaryImages({});
     setFailedCategoryImages({});
 
     fetchCurrentUser()
       .then((user) => {
         if (!isMounted || !user) {
-          return;
+          return null;
         }
 
         return fetchDiaryArchiveByUserId(user.id, selectedYear, selectedMonth);

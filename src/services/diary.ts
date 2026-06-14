@@ -1,8 +1,6 @@
 import { ImageSourcePropType } from 'react-native';
 
 import { supabase } from '@/src/lib/supabase';
-import type { DiaryMockCategory, DiaryMockEntry } from '@/src/mocks/posts';
-import { mockDiaryCategories, mockDiaryEntries } from '@/src/mocks/posts';
 
 type PostImageRow = {
   image_url: string;
@@ -16,9 +14,27 @@ type DiaryPostRow = {
   post_images: PostImageRow[];
 };
 
-type DiaryArchive = {
-  entries: DiaryMockEntry[];
-  categories: DiaryMockCategory[];
+export type DiaryEntry = {
+  day: number;
+  hasPhoto?: boolean;
+  image?: ImageSourcePropType;
+};
+
+export type DiaryCategory = {
+  id: string;
+  title: string;
+  postCount: number;
+  image?: ImageSourcePropType;
+};
+
+export type DiaryArchive = {
+  entries: DiaryEntry[];
+  categories: DiaryCategory[];
+};
+
+const EMPTY_ARCHIVE: DiaryArchive = {
+  entries: [],
+  categories: [],
 };
 
 function getPostImageSource(path: string | null): ImageSourcePropType | undefined {
@@ -43,13 +59,6 @@ function getMonthRange(year: number, month: number) {
   return {
     start: start.toISOString(),
     end: end.toISOString(),
-  };
-}
-
-function fallbackArchive(): DiaryArchive {
-  return {
-    entries: mockDiaryEntries,
-    categories: mockDiaryCategories,
   };
 }
 
@@ -81,10 +90,10 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
       details: postsError?.details,
       hint: postsError?.hint,
     });
-    return fallbackArchive();
+    return EMPTY_ARCHIVE;
   }
 
-  const entriesByDay = new Map<number, DiaryMockEntry>();
+  const entriesByDay = new Map<number, DiaryEntry>();
 
   posts.forEach((post) => {
     const day = new Date(post.created_at).getDate();
@@ -102,7 +111,7 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
   });
 
   const entries = [...entriesByDay.values()];
-  const categoriesByName = new Map<string, DiaryMockCategory>();
+  const categoriesByName = new Map<string, DiaryCategory>();
 
   posts.forEach((post) => {
     const title = post.category?.trim() || '미분류';
@@ -142,7 +151,7 @@ export async function fetchDiaryArchiveByUserTag(tag: string, year: number, mont
 
   if (userError || !user?.id) {
     console.warn('[diary] Profile lookup failed', userError);
-    return fallbackArchive();
+    return EMPTY_ARCHIVE;
   }
 
   return fetchDiaryArchiveByUserId(user.id, year, month);

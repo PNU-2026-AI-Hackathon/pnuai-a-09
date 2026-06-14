@@ -6,27 +6,25 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
-import type { MockNotification } from '@/src/mocks/notifications';
-import { mockUsers } from '@/src/mocks/users';
 import { AppNotification, fetchNotificationsForUserId } from '@/src/services/notifications';
 import { fetchCurrentUser } from '@/src/services/users';
 
-const SECTION_LABELS: Record<MockNotification['section'], string> = {
+const SECTION_LABELS: Record<AppNotification['section'], string> = {
   today: '오늘',
   last_week: '일주일 전',
 };
 
-const SECTION_ORDER: MockNotification['section'][] = ['today', 'last_week'];
+const SECTION_ORDER: AppNotification['section'][] = ['today', 'last_week'];
 
 function getActorName(notification: AppNotification) {
-  return notification.actorName ?? mockUsers.find((user) => user.id === notification.actorUserId)?.name ?? '친구';
+  return notification.actorName ?? '친구';
 }
 
 function getActorProfileImage(notification: AppNotification) {
-  return notification.actorProfileImage ?? mockUsers.find((user) => user.id === notification.actorUserId)?.profile_image;
+  return notification.actorProfileImage;
 }
 
-function getNotificationMessageSuffix(notification: MockNotification) {
+function getNotificationMessageSuffix(notification: AppNotification) {
   if (notification.type === 'like') {
     return '님이 내 게시글을 좋아합니다.';
   }

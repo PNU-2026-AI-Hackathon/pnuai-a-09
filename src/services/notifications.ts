@@ -1,7 +1,9 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import { supabase } from '@/src/lib/supabase';
-import type { MockNotification, NotificationType } from '@/src/mocks/notifications';
+
+export type NotificationType = 'like' | 'comment' | 'reply' | 'new_post';
+export type NotificationSection = 'today' | 'last_week';
 
 type ProfileRow = {
   id: string;
@@ -20,9 +22,19 @@ type NotificationRow = {
   created_at: string;
 };
 
-export type AppNotification = MockNotification & {
+export type AppNotification = {
+  id: string;
+  type: NotificationType;
+  actorUserId: string;
   actorName?: string;
   actorProfileImage?: ImageSourcePropType;
+  targetPostId?: string;
+  postImage?: ImageSourcePropType;
+  commentContent?: string;
+  occurredAt: string;
+  relativeTime: string;
+  section: NotificationSection;
+  isNew?: boolean;
 };
 
 function getPublicStorageUrl(bucket: 'profiles' | 'posts', path: string | null) {
@@ -70,7 +82,7 @@ function getRelativeTime(value: string) {
   return `${Math.floor(days / 7)}주`;
 }
 
-function getSection(value: string): MockNotification['section'] {
+function getSection(value: string): NotificationSection {
   const date = new Date(value);
   const today = new Date();
 

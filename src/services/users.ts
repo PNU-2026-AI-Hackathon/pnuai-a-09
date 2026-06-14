@@ -1,8 +1,8 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import { supabase } from '@/src/lib/supabase';
-import type { MockUser } from '@/src/mocks/users';
-import { mockUsers } from '@/src/mocks/users';
+
+const DEFAULT_PROFILE_IMAGE = require('../../assets/icons/test.png') as ImageSourcePropType;
 
 type UserRow = {
   id: string;
@@ -19,11 +19,22 @@ type UserStats = {
   likeCount: number;
 };
 
-export type AppUser = MockUser;
+export type AppUser = {
+  id: string;
+  name: string;
+  tag: string;
+  profile_image: ImageSourcePropType;
+  description: string;
+  installed_at: string;
+  intimacy_level: number;
+  friends_count: number;
+  like_count: number;
+  post_count: number;
+};
 
-function getProfileImageSource(path: string | null, fallback: ImageSourcePropType): ImageSourcePropType {
+function getProfileImageSource(path: string | null): ImageSourcePropType {
   if (!path) {
-    return fallback;
+    return DEFAULT_PROFILE_IMAGE;
   }
 
   if (path.startsWith('http')) {
@@ -37,12 +48,12 @@ function getProfileImageSource(path: string | null, fallback: ImageSourcePropTyp
   return { uri: data.publicUrl };
 }
 
-function toAppUser(row: UserRow, fallback: MockUser, stats?: UserStats): AppUser {
+function toAppUser(row: UserRow, stats?: UserStats): AppUser {
   return {
     id: row.id,
     name: row.name,
     tag: row.tag,
-    profile_image: getProfileImageSource(row.profile_image_url, fallback.profile_image),
+    profile_image: getProfileImageSource(row.profile_image_url),
     description: row.description ?? '',
     installed_at: row.installed_at,
     intimacy_level: row.intimacy_level,
@@ -52,12 +63,8 @@ function toAppUser(row: UserRow, fallback: MockUser, stats?: UserStats): AppUser
   };
 }
 
-function getFallbackUser(row: Pick<UserRow, 'tag'>) {
-  return mockUsers.find((user) => user.tag === row.tag) ?? mockUsers[0];
-}
-
 export function mapUserRowToAppUser(row: UserRow): AppUser {
-  return toAppUser(row, getFallbackUser(row));
+  return toAppUser(row);
 }
 
 async function fetchUserStats(userId: string): Promise<UserStats | null> {
@@ -125,7 +132,7 @@ export async function fetchUserById(userId: string): Promise<AppUser | null> {
 
   const stats = await fetchUserStats(data.id);
 
-  return toAppUser(data, getFallbackUser(data), stats ?? undefined);
+  return toAppUser(data, stats ?? undefined);
 }
 
 export async function fetchCurrentUser(): Promise<AppUser | null> {
@@ -142,41 +149,24 @@ export async function fetchCurrentUser(): Promise<AppUser | null> {
   return fetchUserById(user.id);
 }
 
-export async function fetchUserByTag(tag: string): Promise<AppUser> {
-  const fallback = mockUsers.find((user) => user.tag === tag) ?? mockUsers[0];
+export async function fetchUserByTag(tag: string): Promise<AppUser | null> {
   const { data, error } = await supabase
     .from('profiles')
     .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level')
     .eq('tag', tag)
-    .single<UserRow>();
+    .maybeSingle<UserRow>();
 
   if (error || !data) {
-    console.warn('[users] Preferred profile not found. Trying first profile.', {
+    console.warn('[users] Failed to load user by tag', {
       code: error?.code,
       message: error?.message,
-      details: error?.details,
-      hint: error?.hint,
     });
-
-    const { data: firstProfile, error: firstProfileError } = await supabase
-      .from('profiles')
-      .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level')
-      .limit(1)
-      .single<UserRow>();
-
-    if (firstProfileError || !firstProfile) {
-      console.warn('[users] Falling back to mock user', firstProfileError);
-      return fallback;
-    }
-
-    const firstProfileStats = await fetchUserStats(firstProfile.id);
-
-    return toAppUser(firstProfile, fallback, firstProfileStats ?? undefined);
+    return null;
   }
 
   const stats = await fetchUserStats(data.id);
 
-  return toAppUser(data, fallback, stats ?? undefined);
+  return toAppUser(data, stats ?? undefined);
 }
 
 function normalizeTag(value: string) {
