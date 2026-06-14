@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   ImageStyle,
   ImageSourcePropType,
@@ -12,16 +14,130 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { login } from '@react-native-seoul/kakao-login';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {FontFamily, gray} from "@/constants/theme";
+import { supabase } from '@/src/lib/supabase';
+import {
+  confirmAuthenticatedUser,
+  getPostLoginRoute,
+  signInAsTestUser,
+  type PostLoginRoute,
+} from '@/src/services/onboarding';
+
+type KakaoLoginToken = {
+  idToken?: string;
+  id_token?: string;
+};
 
 export default function RootIndex() {
   const { width } = useWindowDimensions();
   const backgroundHeight = width * (1024 / 780);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
-  const handleStart = () => {
-    router.replace('/home');
+  useEffect(() => {
+    let isMounted = true;
+
+    confirmAuthenticatedUser()
+      .then(async (user) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const route = await getPostLoginRoute(user);
+        navigateAfterLogin(route);
+      })
+      .catch(() => {
+        // Stay on login screen when there is no active session.
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsCheckingSession(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const navigateAfterLogin = (route: PostLoginRoute) => {
+    if (route.destination === 'home') {
+      router.replace('/home');
+      return;
+    }
+
+    router.replace({
+      pathname: route.step === 'profile' ? '/onboarding/profile' : '/onboarding/terms',
+      params: route.params,
+    });
   };
+
+  const handleKakaoLogin = async () => {
+    if (isAuthLoading) {
+      return;
+    }
+
+    setIsAuthLoading(true);
+    setLoginError(null);
+
+    try {
+      const kakaoToken = (await login()) as KakaoLoginToken;
+      const idToken = kakaoToken.idToken ?? kakaoToken.id_token;
+
+      if (!idToken) {
+        throw new Error('카카오 로그인 결과에서 id_token을 찾을 수 없습니다.');
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithIdToken({
+        provider: 'kakao',
+        token: idToken,
+      });
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      const user = await confirmAuthenticatedUser();
+      const route = await getPostLoginRoute(user);
+      navigateAfterLogin(route);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '카카오 로그인 중 문제가 발생했습니다.';
+      setLoginError(message);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    if (isAuthLoading) {
+      return;
+    }
+
+    setIsAuthLoading(true);
+    setLoginError(null);
+
+    try {
+      const user = await signInAsTestUser();
+      const route = await getPostLoginRoute(user);
+      navigateAfterLogin(route);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '테스트 유저 로그인 중 문제가 발생했습니다.';
+      setLoginError(message);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  if (isCheckingSession) {
+    return (
+      <View style={styles.sessionLoadingScreen}>
+        <ActivityIndicator color="#7ED4FF" size="large" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -45,7 +161,9 @@ export default function RootIndex() {
             style={styles.kakaoButton}
             textStyle={styles.kakaoText}
             iconStyle={styles.kakaoIcon}
-            onPress={handleStart}
+            onPress={handleKakaoLogin}
+            loading={isAuthLoading}
+            disabled={isAuthLoading}
           />
           <SocialLoginButton
             label="Apple로 시작하기"
@@ -53,8 +171,12 @@ export default function RootIndex() {
             style={styles.appleButton}
             textStyle={styles.appleText}
             iconStyle={styles.appleIcon}
-            onPress={handleStart}
+            onPress={handleAppleLogin}
+            loading={isAuthLoading}
+            loadingIndicatorColor="#FFFFFF"
+            disabled={isAuthLoading}
           />
+          {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
         </View>
       </SafeAreaView>
     </View>
@@ -68,6 +190,9 @@ type SocialLoginButtonProps = {
   textStyle: TextStyle;
   iconStyle: ImageStyle;
   onPress: () => void;
+  loading?: boolean;
+  loadingIndicatorColor?: string;
+  disabled?: boolean;
 };
 
 function SocialLoginButton({
@@ -77,14 +202,22 @@ function SocialLoginButton({
   textStyle,
   iconStyle,
   onPress,
+  loading = false,
+  loadingIndicatorColor = '#000000',
+  disabled = false,
 }: SocialLoginButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.loginButton, style, pressed && styles.pressed]}>
-      <Image source={icon} style={[styles.loginIcon, iconStyle]} resizeMode="contain" />
+      style={({ pressed }) => [styles.loginButton, style, disabled && styles.disabled, pressed && styles.pressed]}>
+      {loading ? (
+        <ActivityIndicator color={loadingIndicatorColor} size="small" style={styles.loginIcon} />
+      ) : (
+        <Image source={icon} style={[styles.loginIcon, iconStyle]} resizeMode="contain" />
+      )}
       <Text style={[styles.buttonText, textStyle]}>{label}</Text>
     </Pressable>
   );
@@ -93,6 +226,12 @@ function SocialLoginButton({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: '#F8FAFB',
+  },
+  sessionLoadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#F8FAFB',
   },
   backgroundImage: {
@@ -150,6 +289,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.82,
   },
+  disabled: {
+    opacity: 0.6,
+  },
   loginIcon: {
     marginRight: 10
   },
@@ -172,5 +314,14 @@ const styles = StyleSheet.create({
   },
   appleText: {
     color: '#FFFFFF',
+  },
+  errorText: {
+    maxWidth: 272,
+    marginTop: 4,
+    color: '#D04444',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
 });

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   KeyboardAvoidingView,
@@ -19,6 +20,7 @@ import {
 import type { FeedComment, FeedPost } from '@/src/types/api/feed-post';
 
 import { darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
+import { createComment, toggleCommentLike, togglePostLike } from '@/src/services/posts';
 
 type Props = {
   post: FeedPost;
@@ -71,7 +73,61 @@ function getCommentCount(comments: FeedComment[]) {
   return comments.reduce((count, comment) => count + 1 + (comment.replies?.length ?? 0), 0);
 }
 
-function CommentItem({ comment, isReply = false }: { comment: FeedComment; isReply?: boolean }) {
+function updateCommentInTree(
+  comments: FeedComment[],
+  commentId: string,
+  updater: (comment: FeedComment) => FeedComment,
+): FeedComment[] {
+  return comments.map((comment) => {
+    if (comment.id === commentId) {
+      return updater(comment);
+    }
+
+    if (comment.replies?.length) {
+      return {
+        ...comment,
+        replies: updateCommentInTree(comment.replies, commentId, updater),
+      };
+    }
+
+    return comment;
+  });
+}
+
+function appendReplyToComment(
+  comments: FeedComment[],
+  parentCommentId: string,
+  reply: FeedComment,
+): FeedComment[] {
+  return comments.map((comment) => {
+    if (comment.id === parentCommentId) {
+      return {
+        ...comment,
+        replies: [...(comment.replies ?? []), reply],
+      };
+    }
+
+    return comment;
+  });
+}
+
+function CommentItem({
+  comment,
+  isReply = false,
+  onToggleLike,
+  onReply,
+  isLikePending = false,
+  isReplyTarget = false,
+}: {
+  comment: FeedComment;
+  isReply?: boolean;
+  onToggleLike: (commentId: string) => void;
+  onReply?: (comment: FeedComment) => void;
+  isLikePending?: boolean;
+  isReplyTarget?: boolean;
+}) {
+  const isLiked = comment.is_liked ?? false;
+
   return (
     <View style={[styles.sheetCommentRow, isReply && styles.sheetReplyRow]}>
       <ProfileAvatar uri={comment.profile_image_url} size={isReply ? 40 : 42} />
@@ -81,12 +137,24 @@ function CommentItem({ comment, isReply = false }: { comment: FeedComment; isRep
           {comment.is_author ? <Text style={styles.authorBadge}>작성자</Text> : null}
         </View>
         <Text style={styles.sheetCommentText}>{comment.content}</Text>
-        <Pressable accessibilityRole="button" hitSlop={8}>
-          <Text style={styles.replyText}>Reply</Text>
-        </Pressable>
+        {!isReply && onReply ? (
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => onReply(comment)}
+            style={({ pressed }) => pressed && styles.pressed}>
+            <Text style={[styles.replyText, isReplyTarget && styles.replyTextActive]}>Reply</Text>
+          </Pressable>
+        ) : null}
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="댓글 좋아요" hitSlop={10} style={styles.commentLikeButton}>
-        <Ionicons name={comment.is_author ? 'heart' : 'heart-outline'} size={20} color={comment.is_author ? red : gray} />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={isLiked ? '댓글 좋아요 취소' : '댓글 좋아요'}
+        hitSlop={10}
+        disabled={isLikePending}
+        onPress={() => onToggleLike(comment.id)}
+        style={styles.commentLikeButton}>
+        <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? red : gray} />
       </Pressable>
     </View>
   );
@@ -97,10 +165,32 @@ export function FeedPostCard({ post }: Props) {
   const [isCommentsMounted, setIsCommentsMounted] = useState(false);
   const [draftComment, setDraftComment] = useState('');
   const [localComments, setLocalComments] = useState<FeedComment[]>(post.comments);
+  const [isLiked, setIsLiked] = useState(post.is_liked ?? false);
+  const [likeCount, setLikeCount] = useState(post.like_count);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isPostLikePending, setIsPostLikePending] = useState(false);
+  const [pendingLikeCommentId, setPendingLikeCommentId] = useState<string | null>(null);
+  const [commentError, setCommentError] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
   const sheetProgress = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
+  const commentInputRef = useRef<TextInput>(null);
   const commentCount = useMemo(() => getCommentCount(localComments), [localComments]);
-  const closeComments = useCallback(() => setIsCommentsOpen(false), []);
+  const closeComments = useCallback(() => {
+    setIsCommentsOpen(false);
+    setReplyingTo(null);
+    setDraftComment('');
+    setCommentError(null);
+  }, []);
+
+  useEffect(() => {
+    setLocalComments(post.comments);
+  }, [post.comments]);
+
+  useEffect(() => {
+    setIsLiked(post.is_liked ?? false);
+    setLikeCount(post.like_count);
+  }, [post.is_liked, post.like_count]);
 
   const sheetPanResponder = useMemo(
     () =>
@@ -174,20 +264,103 @@ export function FeedPostCard({ post }: Props) {
   });
   const draggedSheetTranslateY = Animated.add(sheetTranslateY, dragY);
 
-  const submitComment = () => {
-    const content = draftComment.trim();
-    if (!content) return;
+  const handleReply = useCallback((comment: FeedComment) => {
+    setReplyingTo({ id: comment.id, username: comment.username });
+    setCommentError(null);
+    commentInputRef.current?.focus();
+  }, []);
 
-    setLocalComments((prev) => [
-      ...prev,
-      {
-        user_id: `local-${Date.now()}`,
-        profile_image_url: null,
-        username: '나',
-        content,
-      },
-    ]);
-    setDraftComment('');
+  const submitComment = async () => {
+    const content = draftComment.trim();
+    if (!content || isSubmittingComment) {
+      return;
+    }
+
+    const parentCommentId = replyingTo?.id ?? null;
+
+    setIsSubmittingComment(true);
+    setCommentError(null);
+
+    try {
+      const createdComment = await createComment(post.id, content, post.user_id, parentCommentId);
+
+      if (parentCommentId) {
+        setLocalComments((prev) => appendReplyToComment(prev, parentCommentId, createdComment));
+      } else {
+        setLocalComments((prev) => [...prev, createdComment]);
+      }
+
+      setReplyingTo(null);
+      setDraftComment('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '댓글 등록에 실패했습니다.';
+      setCommentError(message);
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleTogglePostLike = async () => {
+    if (isPostLikePending) {
+      return;
+    }
+
+    const previousLiked = isLiked;
+    const previousCount = likeCount;
+
+    setIsPostLikePending(true);
+    setIsLiked(!previousLiked);
+    setLikeCount(Math.max(0, previousCount + (previousLiked ? -1 : 1)));
+
+    try {
+      const nextLiked = await togglePostLike(post.id);
+      setIsLiked(nextLiked);
+    } catch (error) {
+      setIsLiked(previousLiked);
+      setLikeCount(previousCount);
+      const message = error instanceof Error ? error.message : '좋아요 처리에 실패했습니다.';
+      console.warn('[feed-post-card] Failed to toggle post like', message);
+    } finally {
+      setIsPostLikePending(false);
+    }
+  };
+
+  const handleToggleCommentLike = async (commentId: string) => {
+    if (pendingLikeCommentId) {
+      return;
+    }
+
+    const previousComments = localComments;
+    setPendingLikeCommentId(commentId);
+    setCommentError(null);
+    setLocalComments((prev) =>
+      updateCommentInTree(prev, commentId, (comment) => {
+        const nextLiked = !(comment.is_liked ?? false);
+        const currentCount = comment.like_count ?? 0;
+
+        return {
+          ...comment,
+          is_liked: nextLiked,
+          like_count: Math.max(0, currentCount + (nextLiked ? 1 : -1)),
+        };
+      }),
+    );
+
+    try {
+      const nextLiked = await toggleCommentLike(commentId);
+      setLocalComments((prev) =>
+        updateCommentInTree(prev, commentId, (comment) => ({
+          ...comment,
+          is_liked: nextLiked,
+        })),
+      );
+    } catch (error) {
+      setLocalComments(previousComments);
+      const message = error instanceof Error ? error.message : '댓글 좋아요 처리에 실패했습니다.';
+      setCommentError(message);
+    } finally {
+      setPendingLikeCommentId(null);
+    }
   };
 
   return (
@@ -219,10 +392,18 @@ export function FeedPostCard({ post }: Props) {
       <Text style={styles.contents}>{post.contents}</Text>
 
       <View style={styles.actions}>
-        <View style={styles.actionItem}>
-          <Ionicons name="heart" size={20} color={red} />
-          <Text style={styles.actionCount}>{post.like_count}</Text>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isLiked ? '좋아요 취소' : '좋아요'}
+          hitSlop={8}
+          disabled={isPostLikePending}
+          onPress={() => {
+            void handleTogglePostLike();
+          }}
+          style={styles.actionItem}>
+          <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? red : gray} />
+          <Text style={styles.actionCount}>{likeCount}</Text>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="댓글 보기"
@@ -237,7 +418,7 @@ export function FeedPostCard({ post }: Props) {
       {localComments.length > 0 ? (
         <Pressable accessibilityRole="button" onPress={() => setIsCommentsOpen(true)} style={styles.comments}>
           {localComments.map((c) => (
-            <View key={`${post.id}-${c.user_id}-${c.content.slice(0, 8)}`} style={styles.commentRow}>
+            <View key={`${post.id}-${c.id}`} style={styles.commentRow}>
               <ProfileAvatar uri={c.profile_image_url} size={28} />
               <Text style={styles.commentUsername} numberOfLines={1}>
                 {c.username}
@@ -283,36 +464,74 @@ export function FeedPostCard({ post }: Props) {
               contentContainerStyle={styles.sheetListContent}
               showsVerticalScrollIndicator={false}>
               {localComments.map((comment) => (
-                <View key={`sheet-${post.id}-${comment.user_id}-${comment.content.slice(0, 8)}`}>
-                  <CommentItem comment={comment} />
+                <View key={`sheet-${post.id}-${comment.id}`}>
+                  <CommentItem
+                    comment={comment}
+                    onToggleLike={handleToggleCommentLike}
+                    onReply={handleReply}
+                    isLikePending={pendingLikeCommentId === comment.id}
+                    isReplyTarget={replyingTo?.id === comment.id}
+                  />
                   {comment.replies?.map((reply) => (
                     <CommentItem
-                      key={`reply-${post.id}-${comment.user_id}-${reply.user_id}-${reply.content.slice(0, 8)}`}
+                      key={`reply-${post.id}-${reply.id}`}
                       comment={reply}
                       isReply
+                      onToggleLike={handleToggleCommentLike}
+                      isLikePending={pendingLikeCommentId === reply.id}
                     />
                   ))}
                 </View>
               ))}
+              {commentError ? <Text style={styles.commentErrorText}>{commentError}</Text> : null}
             </ScrollView>
 
             <View style={styles.commentInputBar}>
+              {replyingTo ? (
+                <View style={styles.replyingBar}>
+                  <Text style={styles.replyingText} numberOfLines={1}>
+                    {replyingTo.username}님에게 답글
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="답글 취소"
+                    hitSlop={8}
+                    onPress={() => setReplyingTo(null)}
+                    style={({ pressed }) => [styles.replyingCancel, pressed && styles.pressed]}>
+                    <Ionicons name="close" size={16} color={gray} />
+                  </Pressable>
+                </View>
+              ) : null}
               <View style={styles.commentInputPill}>
                 <TextInput
+                  ref={commentInputRef}
                   value={draftComment}
                   onChangeText={setDraftComment}
-                  placeholder="댓글 남기기"
+                  placeholder={replyingTo ? '답글 남기기' : '댓글 남기기'}
                   placeholderTextColor="#B1B1B1"
                   style={styles.commentInput}
                   returnKeyType="send"
-                  onSubmitEditing={submitComment}
+                  editable={!isSubmittingComment}
+                  onSubmitEditing={() => {
+                    void submitComment();
+                  }}
                 />
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="댓글 등록"
-                  onPress={submitComment}
-                  style={[styles.sendButton, draftComment.trim().length > 0 && styles.sendButtonActive]}>
-                  <Ionicons name="arrow-up" size={21} color={white} />
+                  disabled={isSubmittingComment || draftComment.trim().length === 0}
+                  onPress={() => {
+                    void submitComment();
+                  }}
+                  style={[
+                    styles.sendButton,
+                    draftComment.trim().length > 0 && !isSubmittingComment && styles.sendButtonActive,
+                  ]}>
+                  {isSubmittingComment ? (
+                    <ActivityIndicator color={white} size="small" />
+                  ) : (
+                    <Ionicons name="arrow-up" size={21} color={white} />
+                  )}
                 </Pressable>
               </View>
             </View>
@@ -577,6 +796,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
+  replyTextActive: {
+    color: primary,
+  },
+  replyingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  replyingText: {
+    flex: 1,
+    color: gray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  replyingCancel: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.7,
+  },
   commentLikeButton: {
     width: 36,
     height: 36,
@@ -621,5 +866,12 @@ const styles = StyleSheet.create({
   },
   sendButtonActive: {
     backgroundColor: primary,
+  },
+  commentErrorText: {
+    marginTop: 8,
+    color: '#D04444',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

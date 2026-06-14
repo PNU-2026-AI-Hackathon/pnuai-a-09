@@ -1,10 +1,13 @@
-/** 피드 댓글 (목업 — 백엔드 스펙에 맞춰 조정) */
+/** 피드 댓글 */
 export type FeedComment = {
+  id: string;
   user_id: string;
   profile_image_url: string | null;
   username: string;
   content: string;
   is_author?: boolean;
+  is_liked?: boolean;
+  like_count?: number;
   replies?: FeedComment[];
 };
 
@@ -21,5 +24,6 @@ export type FeedPost = {
   image_url: string[];
   contents: string;
   like_count: number;
+  is_liked?: boolean;
   comments: FeedComment[];
 };

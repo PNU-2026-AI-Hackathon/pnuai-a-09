@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -9,11 +10,23 @@ import Svg, { Path } from 'react-native-svg';
 import { PencilIcon } from '@/components/icons/pencil-icon';
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
 import {background, darkGray, FontFamily, gray, lightGray, primary, white} from '@/constants/theme';
-import { mockUsers } from '@/src/mocks/users';
+import { signOutUser } from '@/src/services/onboarding';
+import { AppUser, fetchCurrentUser } from '@/src/services/users';
 
 const whaleImage = require('../../../assets/icons/whale1.png');
 const friendsCheerImage = require('../../../assets/icons/friends_cheer.png');
-const currentUser = mockUsers.find((user) => user.id === 'user-sohee') ?? mockUsers[0];
+const emptyProfile: AppUser = {
+  id: '',
+  name: '',
+  tag: '',
+  profile_image: require('../../../assets/icons/test.png'),
+  description: '',
+  installed_at: new Date().toISOString(),
+  intimacy_level: 1,
+  friends_count: 0,
+  like_count: 0,
+  post_count: 0,
+};
 const NEXT_LEVEL_DAYS = 31;
 
 function getInstalledDays(installedAt: string) {
@@ -98,7 +111,46 @@ function StatCard({
 
 export default function ProfilePage() {
   const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<AppUser>(emptyProfile);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const installedDays = getInstalledDays(currentUser.installed_at);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      fetchCurrentUser()
+        .then((user) => {
+          if (isMounted && user) {
+            setCurrentUser(user);
+          }
+        })
+        .catch((error) => {
+          console.warn('[profile] Failed to load user', error);
+        });
+
+      return () => {
+        isMounted = false;
+      };
+    }, []),
+  );
+
+  const handleLogout = async () => {
+    if (isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+
+    try {
+      await signOutUser();
+      router.replace('/');
+    } catch (error) {
+      console.warn('[profile] Failed to sign out', error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -149,12 +201,12 @@ export default function ProfilePage() {
                 <Text style={styles.tag}>@{currentUser.tag}</Text>
               </View>
               <View style={styles.followItem}>
-                <Text style={styles.followValue}>{currentUser.friends_count}</Text>
+                <Text style={styles.followValue}>0</Text>
                 <Text style={styles.followLabel}>Follower</Text>
               </View>
               <View style={styles.followDivider} />
               <View style={styles.followItem}>
-                <Text style={styles.followValue}>{currentUser.friends_count}</Text>
+                <Text style={styles.followValue}>0</Text>
                 <Text style={styles.followLabel}>Following</Text>
               </View>
             </View>
@@ -195,6 +247,15 @@ export default function ProfilePage() {
             />
           </View>
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="로그아웃"
+          disabled={isSigningOut}
+          onPress={handleLogout}
+          style={({ pressed }) => [styles.logoutButton, (pressed || isSigningOut) && styles.logoutPressed]}>
+          <Text style={styles.logoutText}>{isSigningOut ? '로그아웃 중...' : '로그아웃'}</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -469,5 +530,26 @@ const styles = StyleSheet.create({
     color: darkGray,
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 12,
+  },
+  logoutButton: {
+    marginTop: 32,
+    marginHorizontal: 30,
+    marginBottom: 24,
+    height: 47,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: gray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: white,
+  },
+  logoutPressed: {
+    opacity: 0.7,
+  },
+  logoutText: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

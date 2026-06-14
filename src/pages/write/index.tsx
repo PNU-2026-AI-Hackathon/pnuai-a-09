@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { 
   StyleSheet, 
   View, 
@@ -26,6 +27,8 @@ import AIIcon from '@/components/icons/ai-icon';
 import UnlockIcon from '@/components/icons/unlock-icon';
 
 export default function WritePage() {
+  const router = useRouter();
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
     <KeyboardAvoidingView
@@ -35,7 +38,7 @@ export default function WritePage() {
       <ThemedView style={styles.container}>
         {/* Topbar */}
         <View style={styles.topBar}>
-          <ThemedButton label="취소" variant="ghost" />
+          <ThemedButton label="취소" variant="ghost" onPress={() => router.back()} />
           <View style={styles.topBarRight}>
             <ThemedButton label="저장" variant="light" />
             <ThemedButton label="등록" variant="dark" />

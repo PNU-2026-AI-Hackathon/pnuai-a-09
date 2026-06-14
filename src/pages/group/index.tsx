@@ -3,10 +3,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, LayoutChangeEvent, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import {background, darkGray, FontFamily, gray, primary, white} from '@/constants/theme';
+import { background, darkGray, FontFamily, gray, primary, white } from '@/constants/theme';
 import { useGroupSelection } from '@/src/contexts/group-selection';
-import type { MockUser } from '@/src/mocks/users';
-import { mockUsers } from '@/src/mocks/users';
+import type { AppUser } from '@/src/services/users';
 
 const groupBackground = require('../../../assets/icons/group_background.png');
 const whaleCharacter = require('../../../assets/icons/whale1.png');
@@ -141,15 +140,12 @@ function FloatingWhale() {
 
 export default function GroupPage() {
   const { selectedGroup } = useGroupSelection();
-  const [selectedFriend, setSelectedFriend] = useState<MockUser | null>(null);
+  const [selectedFriend, setSelectedFriend] = useState<AppUser | null>(null);
   const [playArea, setPlayArea] = useState<PlayArea>({ width: 0, height: 0 });
   const [whaleMotions, setWhaleMotions] = useState<Record<string, WhaleMotion>>({});
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number | null>(null);
-  const activeFriends = useMemo(
-    () => mockUsers.filter((user) => selectedGroup.memberIds.includes(user.id)),
-    [selectedGroup],
-  );
+  const activeFriends = useMemo(() => selectedGroup.members, [selectedGroup]);
 
   const handleScreenLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;

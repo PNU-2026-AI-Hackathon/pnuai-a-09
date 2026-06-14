@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useGroupSelection } from '@/src/contexts/group-selection';
-import { mockPosts } from '@/src/mocks/posts';
+import { fetchFeedPostsByUserIds } from '@/src/services/posts';
 import type { FeedPost } from '@/src/types/api/feed-post';
 
 import { FeedPostCard } from '@/src/pages/feed/post-card';
@@ -21,10 +21,30 @@ export default function FeedPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { selectedGroup } = useGroupSelection();
-  const groupPosts = useMemo(
-    () => mockPosts.filter((post) => selectedGroup.memberIds.includes(post.user_id)),
-    [selectedGroup],
-  );
+  const [groupPosts, setGroupPosts] = useState<FeedPost[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setGroupPosts([]);
+
+    fetchFeedPostsByUserIds(selectedGroup.memberIds)
+      .then((posts) => {
+        if (isMounted) {
+          setGroupPosts(posts);
+        }
+      })
+      .catch((error) => {
+        console.warn('[feed] Failed to load posts', error);
+        if (isMounted) {
+          setGroupPosts([]);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedGroup.memberIds]);
 
   const renderItem: ListRenderItem<FeedPost> = ({ item }) => <FeedPostCard post={item} />;
 

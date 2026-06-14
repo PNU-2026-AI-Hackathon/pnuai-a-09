@@ -2,8 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,17 +18,93 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { background, darkGray, FontFamily, gray, white } from '@/constants/theme';
-import { mockUsers } from '@/src/mocks/users';
+import { AppUser, fetchCurrentUser, updateUserProfile } from '@/src/services/users';
 
-const currentUser = mockUsers.find((user) => user.id === 'user-sohee') ?? mockUsers[0];
+const emptyProfile: AppUser = {
+  id: '',
+  name: '',
+  tag: '',
+  profile_image: require('../../../assets/icons/test.png'),
+  description: '',
+  installed_at: new Date().toISOString(),
+  intimacy_level: 1,
+  friends_count: 0,
+  like_count: 0,
+  post_count: 0,
+};
 const MAX_NICKNAME_LENGTH = 10;
 const MAX_TAG_LENGTH = 10;
 const MAX_DESCRIPTION_LENGTH = 100;
 
 export default function ProfileEditPage() {
-  const [nickname, setNickname] = useState(currentUser.name);
-  const [tag, setTag] = useState(currentUser.tag);
-  const [description, setDescription] = useState(currentUser.description);
+  const [currentUser, setCurrentUser] = useState<AppUser>(emptyProfile);
+  const [nickname, setNickname] = useState('');
+  const [tag, setTag] = useState('');
+  const [description, setDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchCurrentUser()
+      .then((user) => {
+        if (!isMounted || !user) {
+          return;
+        }
+
+        setCurrentUser(user);
+        setNickname(user.name);
+        setTag(user.tag);
+        setDescription(user.description);
+      })
+      .catch((error) => {
+        console.warn('[profile-edit] Failed to load profile', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleBack = useCallback(async () => {
+    if (isSaving) {
+      return true;
+    }
+
+    if (!currentUser.id) {
+      router.back();
+      return true;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      await updateUserProfile(currentUser.id, {
+        name: nickname,
+        tag,
+        description,
+      });
+      router.back();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '프로필 저장 중 문제가 발생했습니다.';
+      setSaveError(message);
+    } finally {
+      setIsSaving(false);
+    }
+
+    return true;
+  }, [currentUser.id, description, isSaving, nickname, tag]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      void handleBack();
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, [handleBack]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -41,9 +119,16 @@ export default function ProfileEditPage() {
               accessibilityRole="button"
               accessibilityLabel="뒤로가기"
               hitSlop={10}
-              onPress={() => router.back()}
+              disabled={isSaving}
+              onPress={() => {
+                void handleBack();
+              }}
               style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-              <Ionicons name="chevron-back" size={24} color={darkGray} />
+              {isSaving ? (
+                <ActivityIndicator color={darkGray} size="small" />
+              ) : (
+                <Ionicons name="chevron-back" size={24} color={darkGray} />
+              )}
             </Pressable>
             <Text style={styles.title}>프로필 편집</Text>
             <View style={styles.headerSpacer} />
@@ -74,11 +159,12 @@ export default function ProfileEditPage() {
             <FieldRow label="아이디" count={`(${tag.length}/${MAX_TAG_LENGTH})`}>
               <TextInput
                 value={tag}
-                onChangeText={(text) => setTag(text.replace(/^@/, '').slice(0, MAX_TAG_LENGTH))}
+                onChangeText={(text) => setTag(text.replace(/^@/, '').replace(/[^a-zA-Z0-9_]/g, '').toLowerCase().slice(0, MAX_TAG_LENGTH))}
                 style={styles.input}
                 placeholder="아이디"
                 placeholderTextColor={gray}
                 autoCapitalize="none"
+                autoCorrect={false}
                 maxLength={MAX_TAG_LENGTH}
               />
             </FieldRow>
@@ -99,6 +185,7 @@ export default function ProfileEditPage() {
             <View style={styles.characterRow}>
               <Text style={styles.label}>캐릭터</Text>
             </View>
+            {saveError ? <Text style={styles.errorText}>{saveError}</Text> : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -249,6 +336,13 @@ const styles = StyleSheet.create({
     minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  errorText: {
+    marginTop: 8,
+    color: '#D04444',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 12,
+    lineHeight: 16,
   },
   pressed: {
     opacity: 0.7,
