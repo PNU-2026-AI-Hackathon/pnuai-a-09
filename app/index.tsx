@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -34,7 +34,34 @@ export default function RootIndex() {
   const { width } = useWindowDimensions();
   const backgroundHeight = width * (1024 / 780);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    confirmAuthenticatedUser()
+      .then(async (user) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const route = await getPostLoginRoute(user);
+        navigateAfterLogin(route);
+      })
+      .catch(() => {
+        // Stay on login screen when there is no active session.
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsCheckingSession(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const navigateAfterLogin = (route: PostLoginRoute) => {
     if (route.destination === 'home') {
@@ -43,7 +70,7 @@ export default function RootIndex() {
     }
 
     router.replace({
-      pathname: '/onboarding/terms',
+      pathname: route.step === 'profile' ? '/onboarding/profile' : '/onboarding/terms',
       params: route.params,
     });
   };
@@ -103,6 +130,14 @@ export default function RootIndex() {
       setIsAuthLoading(false);
     }
   };
+
+  if (isCheckingSession) {
+    return (
+      <View style={styles.sessionLoadingScreen}>
+        <ActivityIndicator color="#7ED4FF" size="large" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -191,6 +226,12 @@ function SocialLoginButton({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: '#F8FAFB',
+  },
+  sessionLoadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#F8FAFB',
   },
   backgroundImage: {

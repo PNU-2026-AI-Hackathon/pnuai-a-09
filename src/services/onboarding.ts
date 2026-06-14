@@ -6,6 +6,7 @@ type ProfileOnboardingRow = {
   id: string;
   name: string | null;
   tag: string | null;
+  profile_image_url: string | null;
   onboarding_completed_at: string | null;
 };
 
@@ -184,14 +185,19 @@ export type OnboardingStatus = {
   isComplete: boolean;
   hasProfile: boolean;
   hasTermsAgreement: boolean;
+  profileName: string | null;
+  profileImageUrl: string | null;
 };
 
 export type PostLoginDestination = 'home' | 'onboarding';
+
+export type OnboardingStep = 'terms' | 'profile';
 
 export type PostLoginRoute =
   | { destination: 'home' }
   | {
       destination: 'onboarding';
+      step: OnboardingStep;
       params: {
         nickname: string;
         profileImage: string;
@@ -222,7 +228,7 @@ export async function getOnboardingStatus(userId: string): Promise<OnboardingSta
   const [profileResult, termsResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('id, name, tag, onboarding_completed_at')
+      .select('id, name, tag, profile_image_url, onboarding_completed_at')
       .eq('id', userId)
       .maybeSingle<ProfileOnboardingRow>(),
     supabase
@@ -255,6 +261,8 @@ export async function getOnboardingStatus(userId: string): Promise<OnboardingSta
     isComplete,
     hasProfile,
     hasTermsAgreement,
+    profileName: profile?.name?.trim() || null,
+    profileImageUrl: profile?.profile_image_url?.trim() || null,
   };
 }
 
@@ -264,18 +272,30 @@ export async function resolvePostLoginDestination(userId: string): Promise<PostL
 }
 
 export async function getPostLoginRoute(user: User): Promise<PostLoginRoute> {
-  const { nickname, profileImage } = getAuthUserMetadata(user);
-  const destination = await resolvePostLoginDestination(user.id);
+  const metadata = getAuthUserMetadata(user);
+  const status = await getOnboardingStatus(user.id);
 
-  if (destination === 'home') {
+  if (status.isComplete) {
     return { destination: 'home' };
+  }
+
+  if (status.hasTermsAgreement) {
+    return {
+      destination: 'onboarding',
+      step: 'profile',
+      params: {
+        nickname: status.profileName ?? metadata.nickname,
+        profileImage: status.profileImageUrl ?? metadata.profileImage,
+      },
+    };
   }
 
   return {
     destination: 'onboarding',
+    step: 'terms',
     params: {
-      nickname,
-      profileImage,
+      nickname: metadata.nickname,
+      profileImage: metadata.profileImage,
     },
   };
 }
