@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,6 +16,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { background, darkGray, FontFamily, gray, white } from '@/constants/theme';
+import {
+  completeOnboardingProfile,
+  confirmAuthenticatedUser,
+  getAuthUserMetadata,
+  normalizeTag,
+} from '@/src/services/onboarding';
 
 const MAX_NICKNAME_LENGTH = 10;
 const MAX_TAG_LENGTH = 10;
@@ -28,16 +35,38 @@ export default function OnboardingProfilePage() {
   const [nickname, setNickname] = useState(initialNickname.slice(0, MAX_NICKNAME_LENGTH));
   const [tag, setTag] = useState('');
   const [description, setDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const canComplete = nickname.trim().length > 0 && tag.trim().length > 0;
+  const canComplete = nickname.trim().length > 0 && tag.trim().length > 0 && !isSubmitting;
 
-  const handleComplete = () => {
-    if (!canComplete) {
+  const handleComplete = async () => {
+    if (!canComplete || isSubmitting) {
       return;
     }
 
-    // Supabase profile insert/update and uniqueness checks will be connected after DB schema is finalized.
-    router.replace('/home');
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const user = await confirmAuthenticatedUser();
+      const { email } = getAuthUserMetadata(user);
+
+      await completeOnboardingProfile(user.id, {
+        name: nickname,
+        tag,
+        description,
+        profileImageUrl: profileImage,
+        email,
+      });
+
+      router.replace('/home');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '프로필 저장 중 문제가 발생했습니다.';
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -117,6 +146,7 @@ export default function OnboardingProfilePage() {
               />
             </FieldBlock>
           </View>
+          {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
         </ScrollView>
 
         <View style={styles.footer}>
@@ -126,7 +156,11 @@ export default function OnboardingProfilePage() {
             disabled={!canComplete}
             onPress={handleComplete}
             style={({ pressed }) => [styles.completeButton, !canComplete && styles.disabledButton, pressed && styles.pressed]}>
-            <Text style={styles.completeButtonText}>완료</Text>
+            {isSubmitting ? (
+              <ActivityIndicator color={white} size="small" />
+            ) : (
+              <Text style={styles.completeButtonText}>완료</Text>
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -162,10 +196,6 @@ function sanitizeSingleParam(value?: string | string[]) {
   }
 
   return value ?? '';
-}
-
-function normalizeTag(value: string) {
-  return value.replace(/^@/, '').replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
 }
 
 const styles = StyleSheet.create({
@@ -307,6 +337,15 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 14,
     lineHeight: 20,
+  },
+  errorText: {
+    marginTop: 12,
+    paddingHorizontal: 28,
+    color: '#D04444',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.72,

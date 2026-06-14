@@ -1,10 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { background, darkGray, FontFamily, gray, white } from '@/constants/theme';
+import {
+  confirmAuthenticatedUser,
+  getAuthUserMetadata,
+  saveUserTermsAgreement,
+} from '@/src/services/onboarding';
 
 type TermId = 'service' | 'privacy' | 'marketing' | 'aiTraining';
 
@@ -27,6 +32,8 @@ export default function OnboardingTermsPage() {
     marketing: false,
     aiTraining: false,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const isAllChecked = useMemo(() => terms.every((term) => checkedTerms[term.id]), [checkedTerms]);
   const canContinue = checkedTerms.service && checkedTerms.privacy;
@@ -49,18 +56,48 @@ export default function OnboardingTermsPage() {
     }));
   };
 
-  const handleNext = () => {
-    if (!canContinue) {
+  const handleNext = async () => {
+    if (!canContinue || isSubmitting) {
       return;
     }
 
-    router.push({
-      pathname: '/onboarding/profile',
-      params: {
-        nickname: params.nickname ?? '',
-        profileImage: params.profileImage ?? '',
-      },
-    });
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const user = await confirmAuthenticatedUser();
+      const { email, nickname, profileImage } = getAuthUserMetadata(user);
+      const routeNickname = sanitizeSingleParam(params.nickname) || nickname;
+      const routeProfileImage = sanitizeSingleParam(params.profileImage) || profileImage;
+
+      await saveUserTermsAgreement(
+        user.id,
+        {
+          service: checkedTerms.service,
+          privacy: checkedTerms.privacy,
+          marketing: checkedTerms.marketing,
+          aiTraining: checkedTerms.aiTraining,
+        },
+        {
+          email,
+          name: routeNickname,
+          profileImageUrl: routeProfileImage,
+        },
+      );
+
+      router.push({
+        pathname: '/onboarding/profile',
+        params: {
+          nickname: routeNickname,
+          profileImage: routeProfileImage,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '약관 동의 저장 중 문제가 발생했습니다.';
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -122,16 +159,25 @@ export default function OnboardingTermsPage() {
             </View>
           ))}
         </View>
+        {submitError ? <Text style={styles.errorText}>{submitError}</Text> : null}
       </View>
 
       <View style={styles.footer}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="다음"
-          disabled={!canContinue}
+          disabled={!canContinue || isSubmitting}
           onPress={handleNext}
-          style={({ pressed }) => [styles.nextButton, !canContinue && styles.disabledButton, pressed && styles.pressed]}>
-          <Text style={styles.nextButtonText}>다음</Text>
+          style={({ pressed }) => [
+            styles.nextButton,
+            (!canContinue || isSubmitting) && styles.disabledButton,
+            pressed && styles.pressed,
+          ]}>
+          {isSubmitting ? (
+            <ActivityIndicator color={white} size="small" />
+          ) : (
+            <Text style={styles.nextButtonText}>다음</Text>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -144,6 +190,14 @@ function CheckCircle({ checked, filled = false }: { checked: boolean; filled?: b
       {checked ? <Ionicons name="checkmark" size={16} color={white} /> : null}
     </View>
   );
+}
+
+function sanitizeSingleParam(value?: string | string[]) {
+  if (Array.isArray(value)) {
+    return value[0] ?? '';
+  }
+
+  return value ?? '';
 }
 
 const styles = StyleSheet.create({
@@ -279,6 +333,14 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 14,
     lineHeight: 20,
+  },
+  errorText: {
+    marginTop: 16,
+    color: '#D04444',
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.72,

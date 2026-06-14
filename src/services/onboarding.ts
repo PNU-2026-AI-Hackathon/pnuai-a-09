@@ -15,6 +15,165 @@ type TermsAgreementRow = {
   privacy_policy_agreed: boolean;
 };
 
+export type TermsAgreementInput = {
+  service: boolean;
+  privacy: boolean;
+  marketing: boolean;
+  aiTraining: boolean;
+};
+
+export type OnboardingProfileInput = {
+  name: string;
+  tag: string;
+  description: string;
+  profileImageUrl?: string;
+  email?: string;
+};
+
+export function normalizeTag(value: string) {
+  return value.replace(/^@/, '').replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+}
+
+function mapOnboardingError(error: { code?: string; message?: string }) {
+  if (error.code === '23505') {
+    if (error.message?.includes('profiles_name_unique')) {
+      return new Error('이미 사용 중인 닉네임입니다.');
+    }
+
+    if (error.message?.includes('profiles_tag_unique')) {
+      return new Error('이미 사용 중인 아이디입니다.');
+    }
+
+    return new Error('중복된 값이 있습니다.');
+  }
+
+  if (error.code === '23514') {
+    return new Error('입력값 형식이 올바르지 않습니다.');
+  }
+
+  return new Error(error.message ?? '요청 처리 중 문제가 발생했습니다.');
+}
+
+async function isProfileFieldTaken(
+  field: 'name' | 'tag',
+  value: string,
+  excludeUserId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq(field, value)
+    .neq('id', excludeUserId)
+    .maybeSingle();
+
+  if (error) {
+    throw mapOnboardingError(error);
+  }
+
+  return Boolean(data);
+}
+
+async function upsertProfileStub(
+  userId: string,
+  seed: {
+    email?: string;
+    name?: string;
+    profileImageUrl?: string;
+  },
+): Promise<void> {
+  const { error } = await supabase.from('profiles').upsert(
+    {
+      id: userId,
+      email: seed.email?.trim() || null,
+      name: seed.name?.trim() || null,
+      profile_image_url: seed.profileImageUrl?.trim() || null,
+    },
+    { onConflict: 'id' },
+  );
+
+  if (error) {
+    throw mapOnboardingError(error);
+  }
+}
+
+export async function saveUserTermsAgreement(
+  userId: string,
+  terms: TermsAgreementInput,
+  profileSeed: {
+    email?: string;
+    name?: string;
+    profileImageUrl?: string;
+  },
+): Promise<void> {
+  if (!terms.service || !terms.privacy) {
+    throw new Error('필수 약관에 동의해 주세요.');
+  }
+
+  await upsertProfileStub(userId, profileSeed);
+
+  const { error } = await supabase.from('user_terms_agreements').upsert(
+    {
+      user_id: userId,
+      service_terms_agreed: terms.service,
+      privacy_policy_agreed: terms.privacy,
+      marketing_agreed: terms.marketing,
+      ai_training_agreed: terms.aiTraining,
+      agreed_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id' },
+  );
+
+  if (error) {
+    throw mapOnboardingError(error);
+  }
+}
+
+export async function completeOnboardingProfile(
+  userId: string,
+  values: OnboardingProfileInput,
+): Promise<void> {
+  const name = values.name.trim();
+  const tag = normalizeTag(values.tag);
+  const description = values.description.trim();
+
+  if (!name) {
+    throw new Error('닉네임을 입력해 주세요.');
+  }
+
+  if (!tag) {
+    throw new Error('아이디를 입력해 주세요.');
+  }
+
+  const [isNameTaken, isTagTaken] = await Promise.all([
+    isProfileFieldTaken('name', name, userId),
+    isProfileFieldTaken('tag', tag, userId),
+  ]);
+
+  if (isNameTaken) {
+    throw new Error('이미 사용 중인 닉네임입니다.');
+  }
+
+  if (isTagTaken) {
+    throw new Error('이미 사용 중인 아이디입니다.');
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      email: values.email?.trim() || null,
+      name,
+      tag,
+      description,
+      profile_image_url: values.profileImageUrl?.trim() || null,
+      onboarding_completed_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    throw mapOnboardingError(error);
+  }
+}
+
 export type AuthUserMetadata = {
   nickname: string;
   profileImage: string;
