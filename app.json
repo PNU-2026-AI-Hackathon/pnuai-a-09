@@ -9,9 +9,14 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.whaledone.myapp",
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.whaledone.myapp",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -38,11 +43,24 @@
           }
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "@react-native-seoul/kakao-login",
+        {
+          "kakaoAppKey": "19be534e574dc7e8d8b3b3f7b8a8306f"
+        }
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "701c2a7e-65cf-47d7-b6ed-3d3da2b9c7b9"
+      }
     }
   }
 }

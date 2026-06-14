@@ -155,7 +155,7 @@ export async function fetchFeedPostsByUserIds(userIds: string[]): Promise<FeedPo
       user_id,
       contents,
       created_at,
-      profiles (
+      profiles!posts_user_id_fkey (
         id,
         name,
         profile_image_url
@@ -173,7 +173,7 @@ export async function fetchFeedPostsByUserIds(userIds: string[]): Promise<FeedPo
         parent_comment_id,
         content,
         created_at,
-        profiles (
+        profiles!comments_user_id_fkey (
           id,
           name,
           profile_image_url
