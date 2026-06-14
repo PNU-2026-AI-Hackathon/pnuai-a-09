@@ -11,6 +11,7 @@ import { PencilIcon } from '@/components/icons/pencil-icon';
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
 import {background, darkGray, FontFamily, gray, lightGray, primary, white} from '@/constants/theme';
 import { mockUsers } from '@/src/mocks/users';
+import { signOutUser } from '@/src/services/onboarding';
 import { AppUser, fetchUserByTag } from '@/src/services/users';
 
 const whaleImage = require('../../../assets/icons/whale1.png');
@@ -101,6 +102,7 @@ function StatCard({
 export default function ProfilePage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<AppUser>(fallbackCurrentUser);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const installedDays = getInstalledDays(currentUser.installed_at);
 
   useEffect(() => {
@@ -120,6 +122,23 @@ export default function ProfilePage() {
       isMounted = false;
     };
   }, []);
+
+  const handleLogout = async () => {
+    if (isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+
+    try {
+      await signOutUser();
+      router.replace('/');
+    } catch (error) {
+      console.warn('[profile] Failed to sign out', error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -216,6 +235,15 @@ export default function ProfilePage() {
             />
           </View>
         </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="로그아웃"
+          disabled={isSigningOut}
+          onPress={handleLogout}
+          style={({ pressed }) => [styles.logoutButton, (pressed || isSigningOut) && styles.logoutPressed]}>
+          <Text style={styles.logoutText}>{isSigningOut ? '로그아웃 중...' : '로그아웃'}</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -490,5 +518,26 @@ const styles = StyleSheet.create({
     color: darkGray,
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 12,
+  },
+  logoutButton: {
+    marginTop: 32,
+    marginHorizontal: 30,
+    marginBottom: 24,
+    height: 47,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: gray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: white,
+  },
+  logoutPressed: {
+    opacity: 0.7,
+  },
+  logoutText: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

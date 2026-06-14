@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -19,8 +19,10 @@ import { background, darkGray, FontFamily, gray, white } from '@/constants/theme
 import {
   completeOnboardingProfile,
   confirmAuthenticatedUser,
+  fetchOnboardingProfileSeed,
   getAuthUserMetadata,
   normalizeTag,
+  resolveProfileImageUrl,
 } from '@/src/services/onboarding';
 
 const MAX_NICKNAME_LENGTH = 10;
@@ -30,13 +32,45 @@ const MAX_DESCRIPTION_LENGTH = 100;
 export default function OnboardingProfilePage() {
   const params = useLocalSearchParams<{ nickname?: string; profileImage?: string }>();
   const initialNickname = useMemo(() => sanitizeSingleParam(params.nickname), [params.nickname]);
-  const profileImage = useMemo(() => sanitizeSingleParam(params.profileImage), [params.profileImage]);
+  const initialProfileImage = useMemo(
+    () => resolveProfileImageUrl(sanitizeSingleParam(params.profileImage)),
+    [params.profileImage],
+  );
 
   const [nickname, setNickname] = useState(initialNickname.slice(0, MAX_NICKNAME_LENGTH));
+  const [profileImage, setProfileImage] = useState(initialProfileImage);
   const [tag, setTag] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    confirmAuthenticatedUser()
+      .then(async (user) => {
+        const seed = await fetchOnboardingProfileSeed(user);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (seed.nickname) {
+          setNickname(seed.nickname.slice(0, MAX_NICKNAME_LENGTH));
+        }
+
+        if (seed.profileImage) {
+          setProfileImage(seed.profileImage);
+        }
+      })
+      .catch((error) => {
+        console.warn('[onboarding-profile] Failed to load profile seed', error);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const canComplete = nickname.trim().length > 0 && tag.trim().length > 0 && !isSubmitting;
 
@@ -92,7 +126,12 @@ export default function OnboardingProfilePage() {
 
           <View style={styles.profileImageArea}>
             {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.profileImage} contentFit="cover" />
+              <Image
+                source={{ uri: profileImage }}
+                style={styles.profileImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
             ) : (
               <View style={styles.profilePlaceholder}>
                 <Ionicons name="person" size={43} color={white} />

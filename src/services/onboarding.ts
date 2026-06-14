@@ -74,6 +74,18 @@ async function isProfileFieldTaken(
   return Boolean(data);
 }
 
+function createPendingTag(userId: string) {
+  return `tmp${userId.replace(/-/g, '').slice(0, 7)}`;
+}
+
+function isPlaceholderTag(tag: string | null | undefined) {
+  if (!tag?.trim()) {
+    return true;
+  }
+
+  return tag.startsWith('tmp') || tag.startsWith('user_');
+}
+
 async function upsertProfileStub(
   userId: string,
   seed: {
@@ -82,18 +94,50 @@ async function upsertProfileStub(
     profileImageUrl?: string;
   },
 ): Promise<void> {
-  const { error } = await supabase.from('profiles').upsert(
-    {
-      id: userId,
-      email: seed.email?.trim() || null,
-      name: seed.name?.trim() || null,
-      profile_image_url: seed.profileImageUrl?.trim() || null,
-    },
-    { onConflict: 'id' },
-  );
+  const profileFields = {
+    email: seed.email?.trim() || null,
+    name: seed.name?.trim() || null,
+    profile_image_url: seed.profileImageUrl?.trim() || null,
+  };
 
-  if (error) {
-    throw mapOnboardingError(error);
+  const { data: existing, error: existingError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle<{ id: string }>();
+
+  if (existingError) {
+    throw mapOnboardingError(existingError);
+  }
+
+  if (existing) {
+    const { error } = await supabase.from('profiles').update(profileFields).eq('id', userId);
+
+    if (error) {
+      throw mapOnboardingError(error);
+    }
+
+    return;
+  }
+
+  const { error: insertError } = await supabase.from('profiles').insert({
+    id: userId,
+    ...profileFields,
+    tag: createPendingTag(userId),
+  });
+
+  if (insertError?.code === '23505') {
+    const { error: updateError } = await supabase.from('profiles').update(profileFields).eq('id', userId);
+
+    if (updateError) {
+      throw mapOnboardingError(updateError);
+    }
+
+    return;
+  }
+
+  if (insertError) {
+    throw mapOnboardingError(insertError);
   }
 }
 
@@ -204,6 +248,52 @@ export type PostLoginRoute =
       };
     };
 
+export function resolveProfileImageUrl(url: string | null | undefined): string {
+  if (!url?.trim()) {
+    return '';
+  }
+
+  let normalized = url.trim();
+
+  try {
+    if (normalized.includes('%')) {
+      normalized = decodeURIComponent(normalized);
+    }
+  } catch {
+    // Keep the original URL when decoding fails.
+  }
+
+  if (normalized.startsWith('http://')) {
+    normalized = normalized.replace('http://', 'https://');
+  }
+
+  return normalized;
+}
+
+export async function fetchOnboardingProfileSeed(user: User): Promise<{
+  nickname: string;
+  profileImage: string;
+  email: string;
+}> {
+  const metadata = getAuthUserMetadata(user);
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('name, profile_image_url, email')
+    .eq('id', user.id)
+    .maybeSingle<{
+      name: string | null;
+      profile_image_url: string | null;
+      email: string | null;
+    }>();
+
+  return {
+    nickname: profile?.name?.trim() || metadata.nickname,
+    profileImage: resolveProfileImageUrl(profile?.profile_image_url || metadata.profileImage),
+    email: profile?.email?.trim() || metadata.email,
+  };
+}
+
 export function getAuthUserMetadata(user: User): AuthUserMetadata {
   return {
     nickname:
@@ -211,11 +301,12 @@ export function getAuthUserMetadata(user: User): AuthUserMetadata {
       (user.user_metadata?.nickname as string | undefined) ??
       (user.user_metadata?.name as string | undefined) ??
       '',
-    profileImage:
+    profileImage: resolveProfileImageUrl(
       (user.user_metadata?.profile_image as string | undefined) ??
-      (user.user_metadata?.avatar_url as string | undefined) ??
-      (user.user_metadata?.picture as string | undefined) ??
-      '',
+        (user.user_metadata?.avatar_url as string | undefined) ??
+        (user.user_metadata?.picture as string | undefined) ??
+        '',
+    ),
     email:
       user.email ??
       (user.user_metadata?.account_email as string | undefined) ??
@@ -254,6 +345,7 @@ export async function getOnboardingStatus(userId: string): Promise<OnboardingSta
     profile?.onboarding_completed_at &&
       profile.name?.trim() &&
       profile.tag?.trim() &&
+      !isPlaceholderTag(profile.tag) &&
       hasTermsAgreement,
   );
 
@@ -285,7 +377,7 @@ export async function getPostLoginRoute(user: User): Promise<PostLoginRoute> {
       step: 'profile',
       params: {
         nickname: status.profileName ?? metadata.nickname,
-        profileImage: status.profileImageUrl ?? metadata.profileImage,
+        profileImage: resolveProfileImageUrl(status.profileImageUrl ?? metadata.profileImage),
       },
     };
   }
@@ -331,4 +423,12 @@ export async function signInAsTestUser(): Promise<User> {
   }
 
   return confirmAuthenticatedUser();
+}
+
+export async function signOutUser(): Promise<void> {
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    throw error;
+  }
 }
