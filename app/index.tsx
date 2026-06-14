@@ -18,6 +18,12 @@ import { login } from '@react-native-seoul/kakao-login';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {FontFamily, gray} from "@/constants/theme";
 import { supabase } from '@/src/lib/supabase';
+import {
+  confirmAuthenticatedUser,
+  getPostLoginRoute,
+  signInAsTestUser,
+  type PostLoginRoute,
+} from '@/src/services/onboarding';
 
 type KakaoLoginToken = {
   idToken?: string;
@@ -27,26 +33,27 @@ type KakaoLoginToken = {
 export default function RootIndex() {
   const { width } = useWindowDimensions();
   const backgroundHeight = width * (1024 / 780);
-  const [isKakaoLoading, setIsKakaoLoading] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  const handleStart = () => {
-    router.push({
+  const navigateAfterLogin = (route: PostLoginRoute) => {
+    if (route.destination === 'home') {
+      router.replace('/home');
+      return;
+    }
+
+    router.replace({
       pathname: '/onboarding/terms',
-      params: {
-        // TODO: Replace with Apple user nickname/profile image after Apple login is connected.
-        nickname: '',
-        profileImage: '',
-      },
+      params: route.params,
     });
   };
 
   const handleKakaoLogin = async () => {
-    if (isKakaoLoading) {
+    if (isAuthLoading) {
       return;
     }
 
-    setIsKakaoLoading(true);
+    setIsAuthLoading(true);
     setLoginError(null);
 
     try {
@@ -57,39 +64,43 @@ export default function RootIndex() {
         throw new Error('카카오 로그인 결과에서 id_token을 찾을 수 없습니다.');
       }
 
-      const { data, error } = await supabase.auth.signInWithIdToken({
+      const { error: signInError } = await supabase.auth.signInWithIdToken({
         provider: 'kakao',
         token: idToken,
       });
 
-      if (error) {
-        throw error;
+      if (signInError) {
+        throw signInError;
       }
 
-      const nickname =
-        data.user?.user_metadata?.profile_nickname ??
-        data.user?.user_metadata?.nickname ??
-        data.user?.user_metadata?.name ??
-        '';
-      const profileImage =
-        data.user?.user_metadata?.profile_image ??
-        data.user?.user_metadata?.avatar_url ??
-        data.user?.user_metadata?.picture ??
-        '';
-
-      // TODO: After onboarding tables are ready, route existing completed users directly to /home.
-      router.replace({
-        pathname: '/onboarding/terms',
-        params: {
-          nickname,
-          profileImage,
-        },
-      });
+      const user = await confirmAuthenticatedUser();
+      const route = await getPostLoginRoute(user);
+      navigateAfterLogin(route);
     } catch (error) {
       const message = error instanceof Error ? error.message : '카카오 로그인 중 문제가 발생했습니다.';
       setLoginError(message);
     } finally {
-      setIsKakaoLoading(false);
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    if (isAuthLoading) {
+      return;
+    }
+
+    setIsAuthLoading(true);
+    setLoginError(null);
+
+    try {
+      const user = await signInAsTestUser();
+      const route = await getPostLoginRoute(user);
+      navigateAfterLogin(route);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '테스트 유저 로그인 중 문제가 발생했습니다.';
+      setLoginError(message);
+    } finally {
+      setIsAuthLoading(false);
     }
   };
 
@@ -116,8 +127,8 @@ export default function RootIndex() {
             textStyle={styles.kakaoText}
             iconStyle={styles.kakaoIcon}
             onPress={handleKakaoLogin}
-            loading={isKakaoLoading}
-            disabled={isKakaoLoading}
+            loading={isAuthLoading}
+            disabled={isAuthLoading}
           />
           <SocialLoginButton
             label="Apple로 시작하기"
@@ -125,8 +136,10 @@ export default function RootIndex() {
             style={styles.appleButton}
             textStyle={styles.appleText}
             iconStyle={styles.appleIcon}
-            onPress={handleStart}
-            disabled={isKakaoLoading}
+            onPress={handleAppleLogin}
+            loading={isAuthLoading}
+            loadingIndicatorColor="#FFFFFF"
+            disabled={isAuthLoading}
           />
           {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
         </View>
@@ -143,6 +156,7 @@ type SocialLoginButtonProps = {
   iconStyle: ImageStyle;
   onPress: () => void;
   loading?: boolean;
+  loadingIndicatorColor?: string;
   disabled?: boolean;
 };
 
@@ -154,6 +168,7 @@ function SocialLoginButton({
   iconStyle,
   onPress,
   loading = false,
+  loadingIndicatorColor = '#000000',
   disabled = false,
 }: SocialLoginButtonProps) {
   return (
@@ -164,7 +179,7 @@ function SocialLoginButton({
       onPress={onPress}
       style={({ pressed }) => [styles.loginButton, style, disabled && styles.disabled, pressed && styles.pressed]}>
       {loading ? (
-        <ActivityIndicator color="#000000" size="small" style={styles.loginIcon} />
+        <ActivityIndicator color={loadingIndicatorColor} size="small" style={styles.loginIcon} />
       ) : (
         <Image source={icon} style={[styles.loginIcon, iconStyle]} resizeMode="contain" />
       )}
