@@ -175,13 +175,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 28,
+    paddingHorizontal: 36,
   },
   titleArea: {
     marginTop: 46,
   },
   title: {
-    color: '#111111',
+    color: '#000000',
     fontFamily: FontFamily.pretendardBold,
     fontSize: 24,
     lineHeight: 32,
@@ -189,34 +189,34 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 8,
-    color: '#111111',
+    color: '#000000',
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 16,
+    lineHeight: 18,
     letterSpacing: -0.2,
   },
   allAgreeBox: {
-    height: 53,
     marginTop: 44,
     borderRadius: 5,
+    paddingVertical: 16,
     backgroundColor: background,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
+    marginHorizontal: -12
   },
   allAgreeText: {
     marginLeft: 10,
-    color: '#111111',
+    color: '#000000',
     fontFamily: FontFamily.pretendardMedium,
     fontSize: 16,
     lineHeight: 22,
   },
   termList: {
     marginTop: 26,
-    gap: 24,
+    gap: 30,
   },
   termRow: {
-    height: 30,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -232,8 +232,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   termText: {
-    color: '#111111',
-    fontFamily: FontFamily.pretendardSemiBold,
+    color: '#000000',
+    fontFamily: FontFamily.pretendardMedium,
     fontSize: 16,
     lineHeight: 22,
     letterSpacing: -0.2,
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 28,
-    paddingBottom: 24,
+    paddingBottom: 36,
   },
   nextButton: {
     height: 47,

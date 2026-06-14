@@ -211,14 +211,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   profileImage: {
-    width: 92,
-    height: 92,
+    width: 84,
+    height: 84,
     borderRadius: 46,
     backgroundColor: '#D9D9D9',
   },
   profilePlaceholder: {
-    width: 92,
-    height: 92,
+    width: 84,
+    height: 84,
     borderRadius: 46,
     backgroundColor: '#D9D9D9',
     alignItems: 'center',
@@ -239,12 +239,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   form: {
-    marginTop: 34,
-    paddingHorizontal: 26,
-    gap: 18,
+    marginTop: 45,
+    paddingHorizontal: 28,
+    gap: 20,
   },
   fieldBlock: {
-    gap: 8,
+    gap: 15,
   },
   label: {
     color: darkGray,
@@ -254,12 +254,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   fieldBox: {
-    height: 46,
+    padding: 15,
     borderRadius: 5,
     backgroundColor: background,
     justifyContent: 'center',
-    paddingLeft: 16,
-    paddingRight: 58,
   },
   descriptionBox: {
     height: 114,
@@ -291,11 +289,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 24,
+    bottom: 36,
     paddingHorizontal: 26,
   },
   completeButton: {
-    height: 47,
+    paddingVertical: 15,
     borderRadius: 5,
     backgroundColor: darkGray,
     alignItems: 'center',
