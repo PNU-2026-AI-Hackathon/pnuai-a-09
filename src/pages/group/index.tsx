@@ -1,15 +1,31 @@
-import { Image } from 'expo-image';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, LayoutChangeEvent, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { Image } from "expo-image";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Animated,
+  Easing,
+  LayoutChangeEvent,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import Svg, { Path } from "react-native-svg";
 
-import { background, darkGray, FontFamily, gray, primary, white } from '@/constants/theme';
-import { useGroupSelection } from '@/src/contexts/group-selection';
-import type { AppUser } from '@/src/services/users';
+import {
+  background,
+  darkGray,
+  FontFamily,
+  gray,
+  primary,
+  white,
+} from "@/constants/theme";
+import { useGroupSelection } from "@/src/contexts/group-selection";
+import type { AppUser } from "@/src/services/users";
 
-const groupBackground = require('../../../assets/icons/group_background.png');
-const whaleCharacter = require('../../../assets/icons/whale1.png');
-const whaleGradation = require('../../../assets/icons/gradation.png');
+const groupBackground = require("../../../assets/icons/group_background.png");
+const whaleCharacter = require("../../../assets/icons/whale1.png");
+const whaleGradation = require("../../../assets/icons/gradation.png");
 const noop = () => undefined;
 const MEMBER_CARD_WIDTH = 123;
 const MEMBER_CARD_HEIGHT = 104;
@@ -40,13 +56,23 @@ function clamp(value: number, min: number, max: number) {
 function getMotionBounds(playArea: PlayArea) {
   const minX = BOUNCE_PADDING.left;
   const minY = BOUNCE_PADDING.top;
-  const maxX = Math.max(minX, playArea.width - BOUNCE_PADDING.right - MEMBER_CARD_WIDTH);
-  const maxY = Math.max(minY, playArea.height - BOUNCE_PADDING.bottom - MEMBER_CARD_HEIGHT);
+  const maxX = Math.max(
+    minX,
+    playArea.width - BOUNCE_PADDING.right - MEMBER_CARD_WIDTH,
+  );
+  const maxY = Math.max(
+    minY,
+    playArea.height - BOUNCE_PADDING.bottom - MEMBER_CARD_HEIGHT,
+  );
 
   return { minX, minY, maxX, maxY };
 }
 
-function createInitialMotion(index: number, playArea: PlayArea, position = new Animated.ValueXY()) {
+function createInitialMotion(
+  index: number,
+  playArea: PlayArea,
+  position = new Animated.ValueXY(),
+) {
   const { minX, minY, maxX, maxY } = getMotionBounds(playArea);
   const spanX = Math.max(1, maxX - minX);
   const spanY = Math.max(1, maxY - minY);
@@ -69,7 +95,12 @@ function createInitialMotion(index: number, playArea: PlayArea, position = new A
 function PlusIcon() {
   return (
     <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
-      <Path d="M5.75 0.75L5.75 10.75M10.75 5.75L0.75 5.75" stroke={primary} strokeWidth={1.5} strokeLinecap="round" />
+      <Path
+        d="M5.75 0.75L5.75 10.75M10.75 5.75L0.75 5.75"
+        stroke={primary}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
     </Svg>
   );
 }
@@ -77,7 +108,12 @@ function PlusIcon() {
 function CloseIcon() {
   return (
     <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path d="M5 5L19 19M19 5L5 19" stroke={darkGray} strokeWidth={1.5} strokeLinecap="round" />
+      <Path
+        d="M5 5L19 19M19 5L5 19"
+        stroke={darkGray}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
     </Svg>
   );
 }
@@ -114,7 +150,7 @@ function FloatingWhale() {
   });
   const rotate = motion.interpolate({
     inputRange: [0, 1],
-    outputRange: ['2deg', '7deg'],
+    outputRange: ["2deg", "7deg"],
   });
   const translateX = motion.interpolate({
     inputRange: [0, 1],
@@ -128,7 +164,8 @@ function FloatingWhale() {
         {
           transform: [{ translateX }, { translateY }, { rotate }],
         },
-      ]}>
+      ]}
+    >
       <Image
         source={whaleCharacter}
         style={styles.characterImage}
@@ -142,7 +179,9 @@ export default function GroupPage() {
   const { selectedGroup } = useGroupSelection();
   const [selectedFriend, setSelectedFriend] = useState<AppUser | null>(null);
   const [playArea, setPlayArea] = useState<PlayArea>({ width: 0, height: 0 });
-  const [whaleMotions, setWhaleMotions] = useState<Record<string, WhaleMotion>>({});
+  const [whaleMotions, setWhaleMotions] = useState<Record<string, WhaleMotion>>(
+    {},
+  );
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number | null>(null);
   const activeFriends = useMemo(() => selectedGroup.members, [selectedGroup]);
@@ -191,7 +230,10 @@ export default function GroupPage() {
   }, [activeFriends, playArea]);
 
   useEffect(() => {
-    if (selectedFriend && !activeFriends.some((friend) => friend.id === selectedFriend.id)) {
+    if (
+      selectedFriend &&
+      !activeFriends.some((friend) => friend.id === selectedFriend.id)
+    ) {
       setSelectedFriend(null);
     }
   }, [activeFriends, selectedFriend]);
@@ -207,7 +249,10 @@ export default function GroupPage() {
 
     const tick = (timestamp: number) => {
       const previousTimestamp = lastFrameTimeRef.current ?? timestamp;
-      const deltaSeconds = Math.min((timestamp - previousTimestamp) / 1000, 0.05);
+      const deltaSeconds = Math.min(
+        (timestamp - previousTimestamp) / 1000,
+        0.05,
+      );
       lastFrameTimeRef.current = timestamp;
 
       motions.forEach((motion) => {
@@ -273,14 +318,23 @@ export default function GroupPage() {
                 {
                   transform: motion.position.getTranslateTransform(),
                 },
-              ]}>
+              ]}
+            >
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`${friend.name} 프로필 보기`}
                 onPress={() => setSelectedFriend(friend)}
-                style={({ pressed }) => [styles.memberItem, pressed && styles.memberItemPressed]}>
+                style={({ pressed }) => [
+                  styles.memberItem,
+                  pressed && styles.memberItemPressed,
+                ]}
+              >
                 <View style={styles.characterStack}>
-                  <Image source={whaleGradation} style={styles.characterGradation} contentFit="contain" />
+                  <Image
+                    source={whaleGradation}
+                    style={styles.characterGradation}
+                    contentFit="contain"
+                  />
                   <FloatingWhale />
                 </View>
                 <Text style={styles.characterName}>{friend.name}</Text>
@@ -294,7 +348,8 @@ export default function GroupPage() {
         visible={selectedFriend !== null}
         transparent
         animationType="fade"
-        onRequestClose={() => setSelectedFriend(null)}>
+        onRequestClose={() => setSelectedFriend(null)}
+      >
         <View style={styles.modalBackdrop}>
           <View style={styles.profileCard}>
             <Pressable
@@ -302,16 +357,25 @@ export default function GroupPage() {
               accessibilityLabel="프로필 닫기"
               onPress={() => setSelectedFriend(null)}
               hitSlop={8}
-              style={styles.closeButton}>
+              style={styles.closeButton}
+            >
               <CloseIcon />
             </Pressable>
             {selectedFriend ? (
               <View style={styles.profileContent}>
                 <View style={styles.profileLeft}>
                   <View style={styles.profileImageFrame}>
-                    <Image source={whaleCharacter} style={styles.profileImage} contentFit="contain" />
+                    <Image
+                      source={whaleCharacter}
+                      style={styles.profileImage}
+                      contentFit="contain"
+                    />
                   </View>
-                  <Pressable accessibilityRole="button" onPress={noop} style={styles.visitButton}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={noop}
+                    style={styles.visitButton}
+                  >
                     <Text style={styles.visitButtonText}>방문하기</Text>
                   </Pressable>
                 </View>
@@ -328,15 +392,21 @@ export default function GroupPage() {
                   </Text>
                   <View style={styles.statRow}>
                     <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{selectedFriend.friends_count}</Text>
+                      <Text style={styles.statValue}>
+                        {selectedFriend.friends_count}
+                      </Text>
                       <Text style={styles.statLabel}>Friends</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{selectedFriend.like_count}</Text>
+                      <Text style={styles.statValue}>
+                        {selectedFriend.like_count}
+                      </Text>
                       <Text style={styles.statLabel}>Like</Text>
                     </View>
                     <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{selectedFriend.post_count}</Text>
+                      <Text style={styles.statValue}>
+                        {selectedFriend.post_count}
+                      </Text>
                       <Text style={styles.statLabel}>Post</Text>
                     </View>
                   </View>
@@ -350,7 +420,11 @@ export default function GroupPage() {
         accessibilityRole="button"
         accessibilityLabel="친구초대"
         onPress={noop}
-        style={({ pressed }) => [styles.inviteButton, pressed && styles.inviteButtonPressed]}>
+        style={({ pressed }) => [
+          styles.inviteButton,
+          pressed && styles.inviteButtonPressed,
+        ]}
+      >
         <Text style={styles.inviteText}>친구초대</Text>
         <View style={styles.inviteIcon}>
           <PlusIcon />
@@ -363,11 +437,11 @@ export default function GroupPage() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    overflow: 'hidden',
+    overflow: "hidden",
     backgroundColor: background,
   },
   backgroundImage: {
-    position: 'absolute',
+    position: "absolute",
     top: 25,
     right: 0,
     bottom: -25,
@@ -377,7 +451,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   movingMember: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     width: MEMBER_CARD_WIDTH,
@@ -386,7 +460,7 @@ const styles = StyleSheet.create({
   memberItem: {
     width: MEMBER_CARD_WIDTH,
     height: MEMBER_CARD_HEIGHT,
-    alignItems: 'center',
+    alignItems: "center",
   },
   memberItemPressed: {
     opacity: 0.78,
@@ -396,16 +470,16 @@ const styles = StyleSheet.create({
     height: 60,
   },
   characterGradation: {
-    position: 'absolute',
+    position: "absolute",
     width: 75,
     height: 68,
   },
   characterWhaleMotion: {
-    position: 'absolute',
+    position: "absolute",
     top: 12,
     width: 74,
     height: 50,
-    transformOrigin: '80% 50%',
+    transformOrigin: "80% 50%",
   },
   characterImage: {
     width: 74,
@@ -419,19 +493,19 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   characterTag: {
-    color: '#9EA2A3',
+    color: "#9EA2A3",
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 10,
     lineHeight: 10,
-    left: 4
+    left: 4,
   },
   inviteButton: {
-    position: 'absolute',
+    position: "absolute",
     right: 28,
     bottom: 36,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 10,
   },
   inviteButtonPressed: {
@@ -448,18 +522,18 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 15,
     backgroundColor: white,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalBackdrop: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.20)',
+    backgroundColor: "rgba(0, 0, 0, 0.20)",
   },
   profileCard: {
-    width: '100%',
+    width: "100%",
     maxWidth: 379,
     minHeight: 220,
     borderRadius: 8,
@@ -470,29 +544,29 @@ const styles = StyleSheet.create({
     paddingLeft: 15,
   },
   closeButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 15,
     right: 15,
     width: 24,
     height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   profileContent: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 18,
   },
   profileLeft: {
     width: 116,
-    alignItems: 'center',
+    alignItems: "center",
     paddingTop: 12,
   },
   profileImageFrame: {
     marginTop: 20,
     width: 97,
     height: 64,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   profileImage: {
     width: 97,
@@ -504,8 +578,8 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 4,
     backgroundColor: primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   visitButtonText: {
     color: white,
@@ -518,7 +592,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   profileName: {
-    color: '#000000',
+    color: "#000000",
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 14,
     lineHeight: 18,
@@ -538,24 +612,24 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 18,
     paddingRight: 6,
   },
   statItem: {
     minWidth: 42,
-    alignItems: 'center',
+    alignItems: "center",
   },
   statValue: {
-    color: '#3C4446',
+    color: "#3C4446",
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 12,
     lineHeight: 18,
   },
   statLabel: {
     marginTop: 6,
-    color: '#9EA2A3',
+    color: "#9EA2A3",
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 10,
     lineHeight: 12,

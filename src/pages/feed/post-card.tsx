@@ -34,36 +34,99 @@ function ProfileAvatar({ uri, size }: { uri: string | null; size: number }) {
   return <View style={[styles.avatarPlaceholder, { width: size, height: size, borderRadius: size / 2 }]} />;
 }
 
+function GridTile({ uri, style }: { uri: string; style?: object }) {
+  const hasUri = uri.length > 0;
+
+  return (
+    <View style={[styles.gridTileInner, style]}>
+      {hasUri ? (
+        <Image source={{ uri }} style={styles.gridImage} contentFit="cover" />
+      ) : (
+        <View style={styles.gridPlaceholder} />
+      )}
+    </View>
+  );
+}
+
 function PostImageGrid({ urls }: { urls: string[] }) {
-  if (urls.length === 0) return null;
-
-  const tiles = urls.map((uri, i) => {
-    const hasUri = typeof uri === 'string' && uri.length > 0;
-    return (
-      <View key={i} style={styles.gridTileInner}>
-        {hasUri ? (
-          <Image source={{ uri }} style={styles.gridImage} contentFit="cover" />
-        ) : (
-          <View style={styles.gridPlaceholder} />
-        )}
-      </View>
-    );
-  });
-
-  if (urls.length === 1) {
-    return <View style={styles.gridOne}>{tiles[0]}</View>;
+  const images = urls.slice(0, 6);
+  if (images.length === 0) {
+    return null;
   }
 
-  if (urls.length === 2) {
-    return <View style={styles.gridRow}>{tiles}</View>;
+  if (images.length === 1) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectSquare]}>
+        <GridTile uri={images[0]} />
+      </View>
+    );
+  }
+
+  if (images.length === 2) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectSquare, styles.gridRow]}>
+        <GridTile uri={images[0]} />
+        <GridTile uri={images[1]} />
+      </View>
+    );
+  }
+
+  if (images.length === 3) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectSquare, styles.gridThree]}>
+        <View style={styles.gridThreeLeft}>
+          <GridTile uri={images[0]} />
+        </View>
+        <View style={styles.gridThreeRight}>
+          <GridTile uri={images[1]} />
+          <GridTile uri={images[2]} />
+        </View>
+      </View>
+    );
+  }
+
+  if (images.length === 4) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectSquare, styles.gridColumn]}>
+        <View style={styles.gridRow}>
+          <GridTile uri={images[0]} />
+          <GridTile uri={images[1]} />
+        </View>
+        <View style={styles.gridRow}>
+          <GridTile uri={images[2]} />
+          <GridTile uri={images[3]} />
+        </View>
+      </View>
+    );
+  }
+
+  if (images.length === 5) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectFive, styles.gridColumn]}>
+        <View style={styles.gridRow}>
+          <GridTile uri={images[0]} />
+          <GridTile uri={images[1]} />
+        </View>
+        <View style={styles.gridRow}>
+          <GridTile uri={images[2]} />
+          <GridTile uri={images[3]} />
+          <GridTile uri={images[4]} />
+        </View>
+      </View>
+    );
   }
 
   return (
-    <View style={styles.gridThree}>
-      <View style={styles.gridThreeLeft}>{tiles[0]}</View>
-      <View style={styles.gridThreeRight}>
-        {tiles[1]}
-        {tiles[2]}
+    <View style={[styles.gridContainer, styles.gridAspectSix, styles.gridColumn]}>
+      <View style={styles.gridRow}>
+        <GridTile uri={images[0]} />
+        <GridTile uri={images[1]} />
+        <GridTile uri={images[2]} />
+      </View>
+      <View style={styles.gridRow}>
+        <GridTile uri={images[3]} />
+        <GridTile uri={images[4]} />
+        <GridTile uri={images[5]} />
       </View>
     </View>
   );
@@ -598,37 +661,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: gray,
   },
-  gridOne: {
-    borderRadius: 12,
-    overflow: 'hidden',
+  gridContainer: {
     marginBottom: 12,
+    gap: 3,
+  },
+  gridAspectSquare: {
     aspectRatio: 1,
   },
+  gridAspectFive: {
+    aspectRatio: 5 / 4,
+  },
+  gridAspectSix: {
+    aspectRatio: 3 / 2,
+  },
+  gridColumn: {
+    flexDirection: 'column',
+  },
   gridRow: {
+    flex: 1,
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 12,
-    aspectRatio: 16 / 9,
+    gap: 3,
   },
   gridThree: {
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 12,
-    aspectRatio: 1,
   },
   gridThreeLeft: {
     flex: 1,
-    borderRadius: 12,
     overflow: 'hidden',
   },
   gridThreeRight: {
     flex: 1,
     flexDirection: 'column',
-    gap: 6,
+    gap: 3,
   },
   gridTileInner: {
     flex: 1,
-    borderRadius: 12,
     overflow: 'hidden',
   },
   gridImage: {
