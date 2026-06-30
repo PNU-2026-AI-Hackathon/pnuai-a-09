@@ -1,80 +1,115 @@
 import { useRouter } from 'expo-router';
-import { 
-  StyleSheet, 
-  View, 
-  TextInput, 
-  KeyboardAvoidingView, 
-  Platform, 
-  
+import { useState } from 'react';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedView } from '@/components/themed-view';
-import { ThemedButton } from '@/components/themed-button';
-import { 
-  white, 
-  lightGray, 
-  gray, 
-  darkGray, 
-  primary,
-  FontSize, 
-  FontFamily 
-} from '@/constants/theme';
-
-import UploadIcon from '@/components/icons/upload-icon';
-import UnorderedListIcon from '@/components/icons/unordered-list-icon';
+import { AIBottomSheet } from '@/components/ai-bottom-sheet';
 import AIIcon from '@/components/icons/ai-icon';
 import UnlockIcon from '@/components/icons/unlock-icon';
+import UnorderedListIcon from '@/components/icons/unordered-list-icon';
+import UploadIcon from '@/components/icons/upload-icon';
+import { ThemedButton } from '@/components/themed-button';
+import { ThemedView } from '@/components/themed-view';
+import {
+  darkGray,
+  FontFamily,
+  FontSize,
+  gray,
+  lightGray,
+  primary,
+  white,
+} from '@/constants/theme';
+
+const SAMPLE_RESPONSES = [
+  '마음이 많이 힘들었나봐. 하지만 지난 주에 많이 과로 하지 않았어? 가끔은 쉬어가는 것도 필요하다구~',
+  '오늘 정말 수고했어! 매일 이렇게 노력하는 모습이 너무 대단해. 앞으로도 이렇게만 해줘~',
+  '너는 정말 대단한 사람이야. 오늘도 열심히 살아줘서 고마워!',
+];
 
 export default function WritePage() {
   const router = useRouter();
+  const [text, setText] = useState('');
+  const [isSheetVisible, setIsSheetVisible] = useState(false);
+  const [responseIndex, setResponseIndex] = useState(0);
+
+  const currentResponse = SAMPLE_RESPONSES[responseIndex];
+
+  const handleAIPress = () => {
+    Keyboard.dismiss();
+    setIsSheetVisible(true);
+  };
+
+  const handleRefresh = () => {
+    setResponseIndex((prev) => (prev + 1) % SAMPLE_RESPONSES.length);
+  };
+
+  const handleApply = (appliedText: string) => {
+    setText(appliedText);
+    setIsSheetVisible(false);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-    <KeyboardAvoidingView
-      style={styles.keyboardAvoidingView}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ThemedView style={styles.container}>
-        {/* Topbar */}
-        <View style={styles.topBar}>
-          <ThemedButton label="취소" variant="ghost" onPress={() => router.back()} />
-          <View style={styles.topBarRight}>
-            <ThemedButton label="저장" variant="light" />
-            <ThemedButton label="등록" variant="dark" />
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ThemedView style={styles.container}>
+          {/* Topbar */}
+          <View style={styles.topBar}>
+            <ThemedButton label="취소" variant="ghost" onPress={() => router.back()} />
+            <View style={styles.topBarRight}>
+              <ThemedButton label="저장" variant="light" />
+              <ThemedButton label="등록" variant="dark" />
+            </View>
           </View>
-        </View>
 
-        {/* Divider 1 */}
-        <View style={styles.divider} />
+          <View style={styles.divider} />
 
-        {/* Input 영역 */}
-        <TextInput
-          style={styles.input}
-          placeholder="내용을 입력하세요. (최대 400자)"
-          placeholderTextColor={gray}
-          multiline
-          maxLength={400}
-          textAlignVertical="top"
-        />
+          <TextInput
+            style={styles.input}
+            placeholder="내용을 입력하세요. (최대 400자)"
+            placeholderTextColor={gray}
+            multiline
+            maxLength={400}
+            textAlignVertical="top"
+            value={text}
+            onChangeText={setText}
+          />
 
-        {/* Divider 2 */}
-        <View style={styles.divider} />
+          <View style={styles.divider} />
 
-        {/* Bottombar */}
-        <View style={styles.bottomBar}>
-          <View style={styles.bottomBarLeft}>
-            <UploadIcon width={20} height={20} fill={primary} />
-            <UnorderedListIcon width={20} height={20} fill={primary} />
-            <AIIcon width={34} height={20} fill={primary} />
+          {/* Bottombar */}
+          <View style={styles.bottomBar}>
+            <View style={styles.bottomBarLeft}>
+              <UploadIcon width={20} height={20} fill={primary} />
+              <UnorderedListIcon width={20} height={20} fill={primary} />
+              <Pressable onPress={handleAIPress} hitSlop={8}>
+                <AIIcon width={34} height={20} fill={primary} />
+              </Pressable>
+            </View>
+            <UnlockIcon width={20} height={20} fill={gray} />
           </View>
-          <UnlockIcon width={20} height={20} fill={gray} />
-        </View>
-      </ThemedView>
-    </KeyboardAvoidingView>
+        </ThemedView>
+      </KeyboardAvoidingView>
+
+      <AIBottomSheet
+        visible={isSheetVisible}
+        content={text}
+        aiResponse={currentResponse}
+        onClose={() => setIsSheetVisible(false)}
+        onRefresh={handleRefresh}
+        onApply={handleApply}
+      />
     </SafeAreaView>
   );
-  
 }
 
 const styles = StyleSheet.create({
@@ -125,6 +160,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 20,
   },
-  
-  
 });
