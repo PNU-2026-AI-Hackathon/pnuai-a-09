@@ -25,11 +25,20 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
+      
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "2.0.21" 
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
