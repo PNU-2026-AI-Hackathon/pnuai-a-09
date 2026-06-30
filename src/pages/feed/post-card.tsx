@@ -235,6 +235,7 @@ export function FeedPostCard({ post }: Props) {
   const [pendingLikeCommentId, setPendingLikeCommentId] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
+  const [isPostMenuOpen, setIsPostMenuOpen] = useState(false);
   const sheetProgress = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
   const commentInputRef = useRef<TextInput>(null);
@@ -428,6 +429,14 @@ export function FeedPostCard({ post }: Props) {
 
   return (
     <View style={styles.card}>
+      {isPostMenuOpen ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="메뉴 닫기"
+          style={styles.postMenuBackdrop}
+          onPress={() => setIsPostMenuOpen(false)}
+        />
+      ) : null}
       <View style={styles.header}>
         <ProfileAvatar uri={post.profile_image_url} size={24} />
         <View style={styles.headerMiddle}>
@@ -443,9 +452,25 @@ export function FeedPostCard({ post }: Props) {
             <Text style={styles.relativeTime} numberOfLines={1}>
               {post.relative_time}
             </Text>
-            <Pressable hitSlop={10} accessibilityLabel="게시글 메뉴">
-              <Ionicons name="ellipsis-horizontal" size={20} color={gray} />
-            </Pressable>
+            <View style={styles.menuAnchor}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="게시글 메뉴"
+                hitSlop={10}
+                onPress={() => setIsPostMenuOpen((open) => !open)}>
+                <Ionicons name="ellipsis-horizontal" size={20} color={gray} />
+              </Pressable>
+              {isPostMenuOpen ? (
+                <View style={styles.postMenu}>
+                  <Pressable accessibilityRole="button" style={styles.postMenuItem}>
+                    <Text style={styles.postMenuEdit}>수정</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" style={styles.postMenuItem}>
+                    <Text style={styles.postMenuDelete}>삭제</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
       </View>
@@ -612,6 +637,46 @@ const styles = StyleSheet.create({
     padding: 20,
     marginHorizontal: 16,
     marginBottom: 14,
+    overflow: 'visible',
+  },
+  postMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  menuAnchor: {
+    position: 'relative',
+    zIndex: 2,
+  },
+  postMenu: {
+    position: 'absolute',
+    top: 26,
+    minWidth: 80,
+    right: 0,
+    paddingRight: 24,
+    backgroundColor: white,
+    borderRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  postMenuItem: {
+    paddingHorizontal: 4,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  postMenuEdit: {
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 14,
+    color: darkGray,
+  },
+  postMenuDelete: {
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 14,
+    color: red,
   },
   header: {
     flexDirection: 'row',
