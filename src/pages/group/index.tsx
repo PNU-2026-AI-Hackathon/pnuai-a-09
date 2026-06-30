@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
+import { AnimatedWaveBackground } from "@/components/group/animated-wave-background";
+import { WaterDropDecoration } from "@/components/group/water-drop-decoration";
 import {
   background,
   darkGray,
@@ -20,10 +22,8 @@ import {
   primary,
   white,
 } from "@/constants/theme";
-import { useGroupSelection } from "@/src/contexts/group-selection";
+import { useFriends } from "@/src/contexts/friends";
 import type { AppUser } from "@/src/services/users";
-
-const groupBackground = require("../../../assets/icons/group_background.png");
 const whaleCharacter = require("../../../assets/icons/whale1.png");
 const whaleGradation = require("../../../assets/icons/gradation.png");
 const noop = () => undefined;
@@ -176,7 +176,7 @@ function FloatingWhale() {
 }
 
 export default function GroupPage() {
-  const { selectedGroup } = useGroupSelection();
+  const { circleMembers } = useFriends();
   const [selectedFriend, setSelectedFriend] = useState<AppUser | null>(null);
   const [playArea, setPlayArea] = useState<PlayArea>({ width: 0, height: 0 });
   const [whaleMotions, setWhaleMotions] = useState<Record<string, WhaleMotion>>(
@@ -184,7 +184,7 @@ export default function GroupPage() {
   );
   const animationFrameRef = useRef<number | null>(null);
   const lastFrameTimeRef = useRef<number | null>(null);
-  const activeFriends = useMemo(() => selectedGroup.members, [selectedGroup]);
+  const activeFriends = useMemo(() => circleMembers, [circleMembers]);
 
   const handleScreenLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -297,11 +297,12 @@ export default function GroupPage() {
 
   return (
     <View style={styles.screen} onLayout={handleScreenLayout}>
-      <Image
-        source={groupBackground}
-        style={styles.backgroundImage}
-        contentFit="cover"
-      />
+      <AnimatedWaveBackground style={styles.backgroundImage} />
+      {playArea.width > 0 && playArea.height > 0 ? (
+        <View style={styles.waterDropLayer} pointerEvents="none">
+          <WaterDropDecoration width={playArea.width} height={playArea.height} />
+        </View>
+      ) : null}
       <View style={styles.memberLayer}>
         {activeFriends.map((friend) => {
           const motion = whaleMotions[friend.id];
@@ -425,7 +426,6 @@ export default function GroupPage() {
           pressed && styles.inviteButtonPressed,
         ]}
       >
-        <Text style={styles.inviteText}>친구초대</Text>
         <View style={styles.inviteIcon}>
           <PlusIcon />
         </View>
@@ -442,10 +442,15 @@ const styles = StyleSheet.create({
   },
   backgroundImage: {
     position: "absolute",
-    top: 25,
+    top: 75,
     right: 0,
-    bottom: -25,
+    bottom: -75,
     left: 0,
+  },
+  waterDropLayer: {
+    position: "absolute",
+    top: 150,
+    left: 40,
   },
   memberLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -518,9 +523,9 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   inviteIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 30,
     backgroundColor: white,
     alignItems: "center",
     justifyContent: "center",
