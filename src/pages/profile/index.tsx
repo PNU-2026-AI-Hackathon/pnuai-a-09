@@ -9,7 +9,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { PencilIcon } from '@/components/icons/pencil-icon';
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
-import {background, darkGray, FontFamily, gray, lightGray, primary, white} from '@/constants/theme';
+import { background, darkGray, FontFamily, gray, lightGray, primary, white } from '@/constants/theme';
 import { signOutUser } from '@/src/services/onboarding';
 import { AppUser, fetchCurrentUser } from '@/src/services/users';
 
