@@ -30,7 +30,7 @@ const noop = () => undefined;
 const MEMBER_CARD_WIDTH = 123;
 const MEMBER_CARD_HEIGHT = 104;
 const BOUNCE_PADDING = {
-  top: 33,
+  top: 85,
   right: 18,
   bottom: 77,
   left: 18,
