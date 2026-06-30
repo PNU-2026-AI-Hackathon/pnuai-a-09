@@ -226,6 +226,147 @@ function mapPost(row: PostRow, likedPostIds: Set<string>, likeStatsByCommentId: 
   };
 }
 
+const POST_DETAIL_SELECT = `
+  id,
+  user_id,
+  contents,
+  created_at,
+  profiles!posts_user_id_fkey (
+    id,
+    name,
+    profile_image_url
+  ),
+  post_images (
+    image_url,
+    sort_order
+  ),
+  post_likes (
+    count
+  ),
+  comments (
+    id,
+    user_id,
+    parent_comment_id,
+    content,
+    created_at,
+    profiles!comments_user_id_fkey (
+      id,
+      name,
+      profile_image_url
+    )
+  )
+`;
+
+async function mapPostsFromRows(data: PostRow[]): Promise<FeedPost[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const currentUserId = user?.id ?? null;
+  const likedPostIds = await fetchLikedPostIds(
+    data.map((row) => row.id),
+    currentUserId,
+  );
+  const commentIds = data.flatMap((row) => row.comments.map((comment) => comment.id));
+  const likeStatsByCommentId = await fetchCommentLikeStats(commentIds, currentUserId);
+
+  return data.map((row) => mapPost(row, likedPostIds, likeStatsByCommentId));
+}
+
+export type PostSortOrder = 'latest' | 'oldest';
+
+export async function fetchUserPostCategories(userId: string) {
+  const { data, error } = await supabase
+    .from('posts')
+    .select(
+      `
+      id,
+      category,
+      post_images (
+        image_url,
+        sort_order
+      )
+    `,
+    )
+    .eq('user_id', userId)
+    .returns<
+      Array<{
+        id: string;
+        category: string | null;
+        post_images: PostImageRow[];
+      }>
+    >();
+
+  if (error || !data) {
+    console.warn('[posts] Failed to load user post categories', error);
+    return [];
+  }
+
+  const categoriesByTitle = new Map<
+    string,
+    {
+      id: string;
+      title: string;
+      postCount: number;
+      image?: string;
+    }
+  >();
+
+  data.forEach((post) => {
+    const title = post.category?.trim() || '미분류';
+    const categoryId = title === '미분류' ? 'uncategorized' : title.toLowerCase().replace(/\s+/g, '-');
+    const sortedImages = [...post.post_images].sort((a, b) => a.sort_order - b.sort_order);
+    const imageUrl = getPublicStorageUrl('posts', sortedImages[0]?.image_url ?? null) ?? undefined;
+    const current = categoriesByTitle.get(title);
+
+    categoriesByTitle.set(title, {
+      id: current?.id ?? categoryId,
+      title,
+      postCount: (current?.postCount ?? 0) + 1,
+      image: current?.image ?? imageUrl,
+    });
+  });
+
+  return [
+    {
+      id: 'all',
+      title: '전체',
+      postCount: data.length,
+    },
+    ...categoriesByTitle.values(),
+  ];
+}
+
+export async function fetchUserPostsByCategory(
+  userId: string,
+  categoryId: string,
+  categoryTitle: string,
+  sort: PostSortOrder,
+): Promise<FeedPost[]> {
+  let query = supabase.from('posts').select(POST_DETAIL_SELECT).eq('user_id', userId);
+
+  if (categoryId !== 'all') {
+    if (categoryTitle === '미분류') {
+      query = query.is('category', null);
+    } else {
+      query = query.eq('category', categoryTitle);
+    }
+  }
+
+  const { data, error } = await query
+    .order('created_at', { ascending: sort === 'oldest' })
+    .returns<PostRow[]>();
+
+  if (error || !data) {
+    console.warn('[posts] Failed to load category posts', {
+      code: error?.code,
+      message: error?.message,
+    });
+    return [];
+  }
+
+  return mapPostsFromRows(data);
+}
+
 export async function createComment(
   postId: string,
   content: string,
@@ -385,38 +526,7 @@ export async function fetchFeedPostsByUserIds(userIds: string[]): Promise<FeedPo
 
   const { data, error } = await supabase
     .from('posts')
-    .select(
-      `
-      id,
-      user_id,
-      contents,
-      created_at,
-      profiles!posts_user_id_fkey (
-        id,
-        name,
-        profile_image_url
-      ),
-      post_images (
-        image_url,
-        sort_order
-      ),
-      post_likes (
-        count
-      ),
-      comments (
-        id,
-        user_id,
-        parent_comment_id,
-        content,
-        created_at,
-        profiles!comments_user_id_fkey (
-          id,
-          name,
-          profile_image_url
-        )
-      )
-    `,
-    )
+    .select(POST_DETAIL_SELECT)
     .in('user_id', userIds)
     .order('created_at', { ascending: false })
     .returns<PostRow[]>();
@@ -431,16 +541,5 @@ export async function fetchFeedPostsByUserIds(userIds: string[]): Promise<FeedPo
     return [];
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const currentUserId = user?.id ?? null;
-  const likedPostIds = await fetchLikedPostIds(
-    data.map((row) => row.id),
-    currentUserId,
-  );
-  const commentIds = data.flatMap((row) => row.comments.map((comment) => comment.id));
-  const likeStatsByCommentId = await fetchCommentLikeStats(commentIds, currentUserId);
-
-  return data.map((row) => mapPost(row, likedPostIds, likeStatsByCommentId));
+  return mapPostsFromRows(data);
 }

@@ -34,36 +34,99 @@ function ProfileAvatar({ uri, size }: { uri: string | null; size: number }) {
   return <View style={[styles.avatarPlaceholder, { width: size, height: size, borderRadius: size / 2 }]} />;
 }
 
+function GridTile({ uri, style }: { uri: string; style?: object }) {
+  const hasUri = uri.length > 0;
+
+  return (
+    <View style={[styles.gridTileInner, style]}>
+      {hasUri ? (
+        <Image source={{ uri }} style={styles.gridImage} contentFit="cover" />
+      ) : (
+        <View style={styles.gridPlaceholder} />
+      )}
+    </View>
+  );
+}
+
 function PostImageGrid({ urls }: { urls: string[] }) {
-  if (urls.length === 0) return null;
-
-  const tiles = urls.map((uri, i) => {
-    const hasUri = typeof uri === 'string' && uri.length > 0;
-    return (
-      <View key={i} style={styles.gridTileInner}>
-        {hasUri ? (
-          <Image source={{ uri }} style={styles.gridImage} contentFit="cover" />
-        ) : (
-          <View style={styles.gridPlaceholder} />
-        )}
-      </View>
-    );
-  });
-
-  if (urls.length === 1) {
-    return <View style={styles.gridOne}>{tiles[0]}</View>;
+  const images = urls.slice(0, 6);
+  if (images.length === 0) {
+    return null;
   }
 
-  if (urls.length === 2) {
-    return <View style={styles.gridRow}>{tiles}</View>;
+  if (images.length === 1) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectSquare]}>
+        <GridTile uri={images[0]} />
+      </View>
+    );
+  }
+
+  if (images.length === 2) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectSquare, styles.gridRow]}>
+        <GridTile uri={images[0]} />
+        <GridTile uri={images[1]} />
+      </View>
+    );
+  }
+
+  if (images.length === 3) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectSquare, styles.gridThree]}>
+        <View style={styles.gridThreeLeft}>
+          <GridTile uri={images[0]} />
+        </View>
+        <View style={styles.gridThreeRight}>
+          <GridTile uri={images[1]} />
+          <GridTile uri={images[2]} />
+        </View>
+      </View>
+    );
+  }
+
+  if (images.length === 4) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectSquare, styles.gridColumn]}>
+        <View style={styles.gridRow}>
+          <GridTile uri={images[0]} />
+          <GridTile uri={images[1]} />
+        </View>
+        <View style={styles.gridRow}>
+          <GridTile uri={images[2]} />
+          <GridTile uri={images[3]} />
+        </View>
+      </View>
+    );
+  }
+
+  if (images.length === 5) {
+    return (
+      <View style={[styles.gridContainer, styles.gridAspectFive, styles.gridColumn]}>
+        <View style={styles.gridRow}>
+          <GridTile uri={images[0]} />
+          <GridTile uri={images[1]} />
+        </View>
+        <View style={styles.gridRow}>
+          <GridTile uri={images[2]} />
+          <GridTile uri={images[3]} />
+          <GridTile uri={images[4]} />
+        </View>
+      </View>
+    );
   }
 
   return (
-    <View style={styles.gridThree}>
-      <View style={styles.gridThreeLeft}>{tiles[0]}</View>
-      <View style={styles.gridThreeRight}>
-        {tiles[1]}
-        {tiles[2]}
+    <View style={[styles.gridContainer, styles.gridAspectSix, styles.gridColumn]}>
+      <View style={styles.gridRow}>
+        <GridTile uri={images[0]} />
+        <GridTile uri={images[1]} />
+        <GridTile uri={images[2]} />
+      </View>
+      <View style={styles.gridRow}>
+        <GridTile uri={images[3]} />
+        <GridTile uri={images[4]} />
+        <GridTile uri={images[5]} />
       </View>
     </View>
   );
@@ -172,6 +235,7 @@ export function FeedPostCard({ post }: Props) {
   const [pendingLikeCommentId, setPendingLikeCommentId] = useState<string | null>(null);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
+  const [isPostMenuOpen, setIsPostMenuOpen] = useState(false);
   const sheetProgress = useRef(new Animated.Value(0)).current;
   const dragY = useRef(new Animated.Value(0)).current;
   const commentInputRef = useRef<TextInput>(null);
@@ -365,71 +429,97 @@ export function FeedPostCard({ post }: Props) {
 
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <ProfileAvatar uri={post.profile_image_url} size={24} />
-        <View style={styles.headerMiddle}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.username} numberOfLines={1}>
-              {post.username}
-            </Text>
-            <Text style={styles.createdAt} numberOfLines={1}>
-              {post.created_at}
-            </Text>
-          </View>
-          <View style={styles.headerRight}>
-            <Text style={styles.relativeTime} numberOfLines={1}>
-              {post.relative_time}
-            </Text>
-            <Pressable hitSlop={10} accessibilityLabel="게시글 메뉴">
-              <Ionicons name="ellipsis-horizontal" size={20} color={gray} />
-            </Pressable>
-          </View>
-        </View>
-      </View>
-
-      <PostImageGrid urls={post.image_url} />
-
-      <Text style={styles.contents}>{post.contents}</Text>
-
-      <View style={styles.actions}>
+      {isPostMenuOpen ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={isLiked ? '좋아요 취소' : '좋아요'}
-          hitSlop={8}
-          disabled={isPostLikePending}
-          onPress={() => {
-            void handleTogglePostLike();
-          }}
-          style={styles.actionItem}>
-          <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? red : gray} />
-          <Text style={styles.actionCount}>{likeCount}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="댓글 보기"
-          hitSlop={8}
-          onPress={() => setIsCommentsOpen(true)}
-          style={styles.actionItem}>
-          <Ionicons name="chatbubble-outline" size={18} color={gray} />
-          <Text style={styles.actionCount}>{commentCount}</Text>
-        </Pressable>
-      </View>
-
-      {localComments.length > 0 ? (
-        <Pressable accessibilityRole="button" onPress={() => setIsCommentsOpen(true)} style={styles.comments}>
-          {localComments.map((c) => (
-            <View key={`${post.id}-${c.id}`} style={styles.commentRow}>
-              <ProfileAvatar uri={c.profile_image_url} size={28} />
-              <Text style={styles.commentUsername} numberOfLines={1}>
-                {c.username}
+          accessibilityLabel="메뉴 닫기"
+          style={styles.postMenuBackdrop}
+          onPress={() => setIsPostMenuOpen(false)}
+        />
+      ) : null}
+      <View style={styles.cardContent}>
+        <View style={styles.header}>
+          <ProfileAvatar uri={post.profile_image_url} size={24} />
+          <View style={styles.headerMiddle}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.username} numberOfLines={1}>
+                {post.username}
               </Text>
-              <Text style={styles.commentContent} numberOfLines={1} ellipsizeMode="tail">
-                {c.content}
+              <Text style={styles.createdAt} numberOfLines={1}>
+                {post.created_at}
               </Text>
             </View>
-          ))}
-        </Pressable>
-      ) : null}
+            <View style={styles.headerRight}>
+              <Text style={styles.relativeTime} numberOfLines={1}>
+                {post.relative_time}
+              </Text>
+              <View style={styles.menuAnchor}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="게시글 메뉴"
+                  hitSlop={10}
+                  onPress={() => setIsPostMenuOpen((open) => !open)}>
+                  <Ionicons name="ellipsis-horizontal" size={20} color={gray} />
+                </Pressable>
+                {isPostMenuOpen ? (
+                  <View style={styles.postMenu}>
+                    <Pressable accessibilityRole="button" style={styles.postMenuItem}>
+                      <Text style={styles.postMenuEdit}>수정</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" style={styles.postMenuItem}>
+                      <Text style={styles.postMenuDelete}>삭제</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <PostImageGrid urls={post.image_url} />
+
+        <Text style={styles.contents}>{post.contents}</Text>
+
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isLiked ? '좋아요 취소' : '좋아요'}
+            hitSlop={8}
+            disabled={isPostLikePending}
+            onPress={() => {
+              void handleTogglePostLike();
+            }}
+            style={styles.actionItem}>
+            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? red : gray} />
+            <Text style={styles.actionCount}>{likeCount}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="댓글 보기"
+            hitSlop={8}
+            onPress={() => setIsCommentsOpen(true)}
+            style={styles.actionItem}>
+            <Ionicons name="chatbubble-outline" size={18} color={gray} />
+            <Text style={styles.actionCount}>{commentCount}</Text>
+          </Pressable>
+        </View>
+
+        {localComments.length > 0 ? (
+          <Pressable accessibilityRole="button" onPress={() => setIsCommentsOpen(true)} style={styles.comments}>
+            {localComments.map((c) => (
+              <View key={`${post.id}-${c.id}`} style={styles.commentRow}>
+                <ProfileAvatar uri={c.profile_image_url} size={28} />
+                <Text style={styles.commentUsername} numberOfLines={1}>
+                  {c.username}
+                </Text>
+                <Text style={styles.commentContent} numberOfLines={1} ellipsizeMode="tail">
+                  {c.content}
+                </Text>
+              </View>
+            ))}
+          </Pressable>
+        ) : null}
+      </View>
 
       <Modal
         visible={isCommentsMounted}
@@ -545,10 +635,53 @@ export function FeedPostCard({ post }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    marginHorizontal: 16,
     marginBottom: 14,
+    width: '100%',
+    overflow: 'visible',
+  },
+  cardContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  postMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  menuAnchor: {
+    position: 'relative',
+    zIndex: 2,
+  },
+  postMenu: {
+    position: 'absolute',
+    top: 26,
+    right: 0,
+    minWidth: 80,
+    paddingRight: 24,
+    backgroundColor: white,
+    borderRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  postMenuItem: {
+    paddingHorizontal: 4,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  postMenuEdit: {
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 14,
+    color: darkGray,
+  },
+  postMenuDelete: {
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 14,
+    color: red,
   },
   header: {
     flexDirection: 'row',
@@ -598,37 +731,47 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: gray,
   },
-  gridOne: {
-    borderRadius: 12,
-    overflow: 'hidden',
+  gridContainer: {
+    width: '100%',
+    alignSelf: 'stretch',
     marginBottom: 12,
+    gap: 3,
+  },
+  gridAspectSquare: {
     aspectRatio: 1,
+  },
+  gridAspectFive: {
+    aspectRatio: 5 / 4,
+  },
+  gridAspectSix: {
+    aspectRatio: 3 / 2,
+  },
+  gridColumn: {
+    width: '100%',
+    flexDirection: 'column',
   },
   gridRow: {
+    flex: 1,
+    width: '100%',
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 12,
-    aspectRatio: 16 / 9,
+    gap: 3,
   },
   gridThree: {
+    width: '100%',
     flexDirection: 'row',
-    gap: 6,
-    marginBottom: 12,
-    aspectRatio: 1,
+    gap: 3,
   },
   gridThreeLeft: {
     flex: 1,
-    borderRadius: 12,
     overflow: 'hidden',
   },
   gridThreeRight: {
     flex: 1,
     flexDirection: 'column',
-    gap: 6,
+    gap: 3,
   },
   gridTileInner: {
     flex: 1,
-    borderRadius: 12,
     overflow: 'hidden',
   },
   gridImage: {

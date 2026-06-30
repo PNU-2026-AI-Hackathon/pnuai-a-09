@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
@@ -66,6 +67,7 @@ function FolderIcon() {
 }
 
 export default function DiaryPage() {
+  const router = useRouter();
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
@@ -182,7 +184,20 @@ export default function DiaryPage() {
               const showImage = category.image && !failedCategoryImages[category.id];
 
               return (
-                <View key={category.id} style={styles.categoryItem}>
+                <Pressable
+                  key={category.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${category.title} 카테고리`}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(tabs)/diary/category',
+                      params: {
+                        categoryId: category.id,
+                        categoryTitle: category.title,
+                      },
+                    })
+                  }
+                  style={styles.categoryItem}>
                   <View style={styles.folderStack}>
                     <View style={styles.folderBack} />
                     {showImage ? (
@@ -203,7 +218,7 @@ export default function DiaryPage() {
                     {category.title}
                   </Text>
                   <Text style={styles.postCount}>{category.postCount} posts</Text>
-                </View>
+                </Pressable>
               );
             })}
           </ScrollView>
@@ -397,7 +412,7 @@ const styles = StyleSheet.create({
   folderImage: {
     position: 'absolute',
     top: 0,
-    left: 12,
+    left: 9,
     width: 55,
     height: 52,
     borderRadius: 5,

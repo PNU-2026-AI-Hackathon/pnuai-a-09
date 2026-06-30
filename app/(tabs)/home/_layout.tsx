@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HomeHeader } from '@/components/home/home-header';
 import { background } from '@/constants/theme';
-import { GroupSelectionProvider } from '@/src/contexts/group-selection';
+import { FriendsProvider } from '@/src/contexts/friends';
 
 export default function HomeLayout() {
   const insets = useSafeAreaInsets();
@@ -14,14 +14,14 @@ export default function HomeLayout() {
   const topPadding = shouldShowHeader ? insets.top : 0;
 
   return (
-    <GroupSelectionProvider>
+    <FriendsProvider>
       <View style={[styles.root, { paddingTop: topPadding }]}>
         {shouldShowHeader ? <HomeHeader /> : null}
         <View style={styles.stackWrap}>
           <Slot />
         </View>
       </View>
-    </GroupSelectionProvider>
+    </FriendsProvider>
   );
 }
 

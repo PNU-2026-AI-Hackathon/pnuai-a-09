@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useGroupSelection } from '@/src/contexts/group-selection';
+import { useFriends } from '@/src/contexts/friends';
 import { fetchFeedPostsByUserIds } from '@/src/services/posts';
 import type { FeedPost } from '@/src/types/api/feed-post';
 
@@ -20,31 +20,40 @@ const FAB_GAP_ABOVE_TAB = -80;
 export default function FeedPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { selectedGroup } = useGroupSelection();
-  const [groupPosts, setGroupPosts] = useState<FeedPost[]>([]);
+  const { feedUserIds, isLoading } = useFriends();
+  const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
 
   useEffect(() => {
     let isMounted = true;
 
-    setGroupPosts([]);
+    if (isLoading) {
+      return;
+    }
 
-    fetchFeedPostsByUserIds(selectedGroup.memberIds)
+    if (feedUserIds.length === 0) {
+      setFeedPosts([]);
+      return;
+    }
+
+    setFeedPosts([]);
+
+    fetchFeedPostsByUserIds(feedUserIds)
       .then((posts) => {
         if (isMounted) {
-          setGroupPosts(posts);
+          setFeedPosts(posts);
         }
       })
       .catch((error) => {
         console.warn('[feed] Failed to load posts', error);
         if (isMounted) {
-          setGroupPosts([]);
+          setFeedPosts([]);
         }
       });
 
     return () => {
       isMounted = false;
     };
-  }, [selectedGroup.memberIds]);
+  }, [feedUserIds, isLoading]);
 
   const renderItem: ListRenderItem<FeedPost> = ({ item }) => <FeedPostCard post={item} />;
 
@@ -54,7 +63,7 @@ export default function FeedPage() {
   return (
     <View style={styles.screen}>
       <FlatList
-        data={groupPosts}
+        data={feedPosts}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad }]}
