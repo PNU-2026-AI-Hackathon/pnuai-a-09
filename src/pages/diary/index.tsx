@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
@@ -66,6 +67,7 @@ function FolderIcon() {
 }
 
 export default function DiaryPage() {
+  const router = useRouter();
   const now = new Date();
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
@@ -182,7 +184,20 @@ export default function DiaryPage() {
               const showImage = category.image && !failedCategoryImages[category.id];
 
               return (
-                <View key={category.id} style={styles.categoryItem}>
+                <Pressable
+                  key={category.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${category.title} 카테고리`}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(tabs)/diary/category',
+                      params: {
+                        categoryId: category.id,
+                        categoryTitle: category.title,
+                      },
+                    })
+                  }
+                  style={styles.categoryItem}>
                   <View style={styles.folderStack}>
                     <View style={styles.folderBack} />
                     {showImage ? (
@@ -203,7 +218,7 @@ export default function DiaryPage() {
                     {category.title}
                   </Text>
                   <Text style={styles.postCount}>{category.postCount} posts</Text>
-                </View>
+                </Pressable>
               );
             })}
           </ScrollView>

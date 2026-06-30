@@ -437,87 +437,89 @@ export function FeedPostCard({ post }: Props) {
           onPress={() => setIsPostMenuOpen(false)}
         />
       ) : null}
-      <View style={styles.header}>
-        <ProfileAvatar uri={post.profile_image_url} size={24} />
-        <View style={styles.headerMiddle}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.username} numberOfLines={1}>
-              {post.username}
-            </Text>
-            <Text style={styles.createdAt} numberOfLines={1}>
-              {post.created_at}
-            </Text>
-          </View>
-          <View style={styles.headerRight}>
-            <Text style={styles.relativeTime} numberOfLines={1}>
-              {post.relative_time}
-            </Text>
-            <View style={styles.menuAnchor}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="게시글 메뉴"
-                hitSlop={10}
-                onPress={() => setIsPostMenuOpen((open) => !open)}>
-                <Ionicons name="ellipsis-horizontal" size={20} color={gray} />
-              </Pressable>
-              {isPostMenuOpen ? (
-                <View style={styles.postMenu}>
-                  <Pressable accessibilityRole="button" style={styles.postMenuItem}>
-                    <Text style={styles.postMenuEdit}>수정</Text>
-                  </Pressable>
-                  <Pressable accessibilityRole="button" style={styles.postMenuItem}>
-                    <Text style={styles.postMenuDelete}>삭제</Text>
-                  </Pressable>
-                </View>
-              ) : null}
+      <View style={styles.cardContent}>
+        <View style={styles.header}>
+          <ProfileAvatar uri={post.profile_image_url} size={24} />
+          <View style={styles.headerMiddle}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.username} numberOfLines={1}>
+                {post.username}
+              </Text>
+              <Text style={styles.createdAt} numberOfLines={1}>
+                {post.created_at}
+              </Text>
+            </View>
+            <View style={styles.headerRight}>
+              <Text style={styles.relativeTime} numberOfLines={1}>
+                {post.relative_time}
+              </Text>
+              <View style={styles.menuAnchor}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="게시글 메뉴"
+                  hitSlop={10}
+                  onPress={() => setIsPostMenuOpen((open) => !open)}>
+                  <Ionicons name="ellipsis-horizontal" size={20} color={gray} />
+                </Pressable>
+                {isPostMenuOpen ? (
+                  <View style={styles.postMenu}>
+                    <Pressable accessibilityRole="button" style={styles.postMenuItem}>
+                      <Text style={styles.postMenuEdit}>수정</Text>
+                    </Pressable>
+                    <Pressable accessibilityRole="button" style={styles.postMenuItem}>
+                      <Text style={styles.postMenuDelete}>삭제</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
             </View>
           </View>
         </View>
+
+        <PostImageGrid urls={post.image_url} />
+
+        <Text style={styles.contents}>{post.contents}</Text>
+
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isLiked ? '좋아요 취소' : '좋아요'}
+            hitSlop={8}
+            disabled={isPostLikePending}
+            onPress={() => {
+              void handleTogglePostLike();
+            }}
+            style={styles.actionItem}>
+            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? red : gray} />
+            <Text style={styles.actionCount}>{likeCount}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="댓글 보기"
+            hitSlop={8}
+            onPress={() => setIsCommentsOpen(true)}
+            style={styles.actionItem}>
+            <Ionicons name="chatbubble-outline" size={18} color={gray} />
+            <Text style={styles.actionCount}>{commentCount}</Text>
+          </Pressable>
+        </View>
+
+        {localComments.length > 0 ? (
+          <Pressable accessibilityRole="button" onPress={() => setIsCommentsOpen(true)} style={styles.comments}>
+            {localComments.map((c) => (
+              <View key={`${post.id}-${c.id}`} style={styles.commentRow}>
+                <ProfileAvatar uri={c.profile_image_url} size={28} />
+                <Text style={styles.commentUsername} numberOfLines={1}>
+                  {c.username}
+                </Text>
+                <Text style={styles.commentContent} numberOfLines={1} ellipsizeMode="tail">
+                  {c.content}
+                </Text>
+              </View>
+            ))}
+          </Pressable>
+        ) : null}
       </View>
-
-      <PostImageGrid urls={post.image_url} />
-
-      <Text style={styles.contents}>{post.contents}</Text>
-
-      <View style={styles.actions}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isLiked ? '좋아요 취소' : '좋아요'}
-          hitSlop={8}
-          disabled={isPostLikePending}
-          onPress={() => {
-            void handleTogglePostLike();
-          }}
-          style={styles.actionItem}>
-          <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={20} color={isLiked ? red : gray} />
-          <Text style={styles.actionCount}>{likeCount}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="댓글 보기"
-          hitSlop={8}
-          onPress={() => setIsCommentsOpen(true)}
-          style={styles.actionItem}>
-          <Ionicons name="chatbubble-outline" size={18} color={gray} />
-          <Text style={styles.actionCount}>{commentCount}</Text>
-        </Pressable>
-      </View>
-
-      {localComments.length > 0 ? (
-        <Pressable accessibilityRole="button" onPress={() => setIsCommentsOpen(true)} style={styles.comments}>
-          {localComments.map((c) => (
-            <View key={`${post.id}-${c.id}`} style={styles.commentRow}>
-              <ProfileAvatar uri={c.profile_image_url} size={28} />
-              <Text style={styles.commentUsername} numberOfLines={1}>
-                {c.username}
-              </Text>
-              <Text style={styles.commentContent} numberOfLines={1} ellipsizeMode="tail">
-                {c.content}
-              </Text>
-            </View>
-          ))}
-        </Pressable>
-      ) : null}
 
       <Modal
         visible={isCommentsMounted}
@@ -633,11 +635,14 @@ export function FeedPostCard({ post }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    marginHorizontal: 16,
     marginBottom: 14,
+    width: '100%',
     overflow: 'visible',
+  },
+  cardContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   postMenuBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -650,11 +655,11 @@ const styles = StyleSheet.create({
   postMenu: {
     position: 'absolute',
     top: 26,
-    minWidth: 80,
     right: 0,
-    paddingRight: 24,
+    minWidth: 80,
     backgroundColor: white,
     borderRadius: 4,
+    paddingHorizontal: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
@@ -727,6 +732,8 @@ const styles = StyleSheet.create({
     color: gray,
   },
   gridContainer: {
+    width: '100%',
+    alignSelf: 'stretch',
     marginBottom: 12,
     gap: 3,
   },
@@ -740,15 +747,19 @@ const styles = StyleSheet.create({
     aspectRatio: 3 / 2,
   },
   gridColumn: {
+    width: '100%',
     flexDirection: 'column',
   },
   gridRow: {
     flex: 1,
+    width: '100%',
     flexDirection: 'row',
     gap: 3,
   },
   gridThree: {
+    width: '100%',
     flexDirection: 'row',
+    gap: 3,
   },
   gridThreeLeft: {
     flex: 1,
