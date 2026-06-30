@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AIBottomSheet } from '@/components/ai-bottom-sheet';
+import { PostSettingsBottomSheet } from '@/components/post-settings-bottom-sheet';
 import AIIcon from '@/components/icons/ai-icon';
 import UnlockIcon from '@/components/icons/unlock-icon';
 import UnorderedListIcon from '@/components/icons/unordered-list-icon';
@@ -38,6 +39,7 @@ export default function WritePage() {
   const router = useRouter();
   const [text, setText] = useState('');
   const [isSheetVisible, setIsSheetVisible] = useState(false);
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [responseIndex, setResponseIndex] = useState(0);
 
   const currentResponse = SAMPLE_RESPONSES[responseIndex];
@@ -67,7 +69,7 @@ export default function WritePage() {
             <ThemedButton label="취소" variant="ghost" onPress={() => router.back()} />
             <View style={styles.topBarRight}>
               <ThemedButton label="저장" variant="light" />
-              <ThemedButton label="등록" variant="dark" />
+              <ThemedButton label="등록" variant="dark" onPress={() => { Keyboard.dismiss(); setIsSettingsVisible(true); }} />
             </View>
           </View>
 
@@ -99,6 +101,15 @@ export default function WritePage() {
           </View>
         </ThemedView>
       </KeyboardAvoidingView>
+
+      <PostSettingsBottomSheet
+        visible={isSettingsVisible}
+        onClose={() => setIsSettingsVisible(false)}
+        onSubmit={(_category, _visibility) => {
+          setIsSettingsVisible(false);
+          // TODO: 실제 등록 API 연결
+        }}
+      />
 
       <AIBottomSheet
         visible={isSheetVisible}
