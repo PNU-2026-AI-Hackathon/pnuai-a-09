@@ -1,8 +1,7 @@
 {
   "cli": {
     "version": ">= 20.1.0",
-    "appVersionSource": "remote",
-    "autoIncrement": true
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -15,6 +14,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://wrjeyohgbdtvmpxseruo.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_iqgj3VUQjCOLoL-dDZddow_ugjHl6Zd"
@@ -22,6 +22,7 @@
     },
     "production": {
       "distribution": "store",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://wrjeyohgbdtvmpxseruo.supabase.co",
         "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_iqgj3VUQjCOLoL-dDZddow_ugjHl6Zd"
