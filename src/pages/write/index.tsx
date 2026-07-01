@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -12,6 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AIBottomSheet } from '@/components/ai-bottom-sheet';
+import { CustomImagePicker } from '@/components/custom-image-picker';
+import { ImageGrid } from '@/components/image-grid';
 import { PostSettingsBottomSheet } from '@/components/post-settings-bottom-sheet';
 import AIIcon from '@/components/icons/ai-icon';
 import UnlockIcon from '@/components/icons/unlock-icon';
@@ -40,7 +43,9 @@ export default function WritePage() {
   const [text, setText] = useState('');
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [isPickerVisible, setIsPickerVisible] = useState(false);
   const [responseIndex, setResponseIndex] = useState(0);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
 
   const currentResponse = SAMPLE_RESPONSES[responseIndex];
 
@@ -58,6 +63,15 @@ export default function WritePage() {
     setIsSheetVisible(false);
   };
 
+  const handlePickerConfirm = (uris: string[]) => {
+    setSelectedImages(uris.slice(0, 6));
+    setIsPickerVisible(false);
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView
@@ -69,29 +83,46 @@ export default function WritePage() {
             <ThemedButton label="취소" variant="ghost" onPress={() => router.back()} />
             <View style={styles.topBarRight}>
               <ThemedButton label="저장" variant="light" />
-              <ThemedButton label="등록" variant="dark" onPress={() => { Keyboard.dismiss(); setIsSettingsVisible(true); }} />
+              <ThemedButton
+                label="등록"
+                variant="dark"
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setIsSettingsVisible(true);
+                }}
+              />
             </View>
           </View>
 
           <View style={styles.divider} />
 
-          <TextInput
-            style={styles.input}
-            placeholder="내용을 입력하세요. (최대 400자)"
-            placeholderTextColor={gray}
-            multiline
-            maxLength={400}
-            textAlignVertical="top"
-            value={text}
-            onChangeText={setText}
-          />
+          {/* 사진 그리드 + 텍스트 입력 영역 */}
+          <View style={styles.contentArea}>
+            {selectedImages.length > 0 && (
+              <View style={styles.gridWrapper}>
+                <ImageGrid uris={selectedImages} onRemove={removeImage} />
+              </View>
+            )}
+            <TextInput
+              style={styles.input}
+              placeholder="내용을 입력하세요. (최대 400자)"
+              placeholderTextColor={gray}
+              multiline
+              maxLength={400}
+              textAlignVertical="top"
+              value={text}
+              onChangeText={setText}
+            />
+          </View>
 
           <View style={styles.divider} />
 
           {/* Bottombar */}
           <View style={styles.bottomBar}>
             <View style={styles.bottomBarLeft}>
-              <UploadIcon width={20} height={20} fill={primary} />
+              <Pressable onPress={() => setIsPickerVisible(true)} hitSlop={8}>
+                <UploadIcon width={20} height={20} fill={primary} />
+              </Pressable>
               <UnorderedListIcon width={20} height={20} fill={primary} />
               <Pressable onPress={handleAIPress} hitSlop={8}>
                 <AIIcon width={34} height={20} fill={primary} />
@@ -101,6 +132,18 @@ export default function WritePage() {
           </View>
         </ThemedView>
       </KeyboardAvoidingView>
+
+      {/* 사진 선택 피커 (전체화면 모달) */}
+      <Modal
+        visible={isPickerVisible}
+        animationType="slide"
+        onRequestClose={() => setIsPickerVisible(false)}>
+        <CustomImagePicker
+          onConfirm={handlePickerConfirm}
+          onClose={() => setIsPickerVisible(false)}
+          maxSelect={6}
+        />
+      </Modal>
 
       <PostSettingsBottomSheet
         visible={isSettingsVisible}
@@ -150,6 +193,12 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: lightGray,
     marginVertical: 10,
+  },
+  contentArea: {
+    flex: 1,
+  },
+  gridWrapper: {
+    paddingHorizontal: 20,
   },
   input: {
     flex: 1,
