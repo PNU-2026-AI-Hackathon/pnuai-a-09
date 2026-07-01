@@ -2,6 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -26,12 +27,13 @@ interface Props {
   onConfirm: (uris: string[]) => void;
   onClose: () => void;
   maxSelect?: number;
+  initialSelectedUris?: string[];
 }
 
 type PhotoItem = { uri: string; id: string };
 type GridItem = { type: 'camera' } | { type: 'photo'; item: PhotoItem };
 
-export function CustomImagePicker({ onConfirm, onClose, maxSelect = 10 }: Props) {
+export function CustomImagePicker({ onConfirm, onClose, maxSelect = 10, initialSelectedUris = [] }: Props) {
   const insets = useSafeAreaInsets();
   const [mediaPermission, requestMediaPermission, getMediaPermission] = MediaLibrary.usePermissions();
 
@@ -76,6 +78,12 @@ export function CustomImagePicker({ onConfirm, onClose, maxSelect = 10 }: Props)
       setPhotos(result.assets.map(a => ({ uri: a.uri, id: a.id })));
       endCursorRef.current = result.endCursor;
       hasNextPageRef.current = result.hasNextPage;
+      if (initialSelectedUris.length > 0) {
+        const restoredIds = result.assets
+          .filter(a => initialSelectedUris.includes(a.uri))
+          .map(a => a.id);
+        if (restoredIds.length > 0) setSelectedIds(restoredIds);
+      }
     } catch (e) {
       console.warn('[CustomImagePicker] loadInitial error', e);
     } finally {
@@ -122,7 +130,10 @@ export function CustomImagePicker({ onConfirm, onClose, maxSelect = 10 }: Props)
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       if (prev.includes(id)) return prev.filter(s => s !== id);
-      if (prev.length >= maxSelect) return prev;
+      if (prev.length >= maxSelect) {
+        Alert.alert('선택 초과', `최대 ${maxSelect}장까지 선택할 수 있습니다.`);
+        return prev;
+      }
       return [...prev, id];
     });
   };

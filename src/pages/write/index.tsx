@@ -142,6 +142,7 @@ export default function WritePage() {
           onConfirm={handlePickerConfirm}
           onClose={() => setIsPickerVisible(false)}
           maxSelect={6}
+          initialSelectedUris={selectedImages}
         />
       </Modal>
 
