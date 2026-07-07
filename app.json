@@ -11,6 +11,7 @@
     "ios": {
       "bundleIdentifier": "com.whaledone.myapp",
       "supportsTablet": true,
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -85,7 +86,9 @@
           "savePhotosPermission": "촬영한 사진을 저장하기 위해 사진첩 접근 권한이 필요합니다.",
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-apple-authentication",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
