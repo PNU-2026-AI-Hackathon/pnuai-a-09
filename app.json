@@ -11,6 +11,7 @@
     "ios": {
       "bundleIdentifier": "com.whaledone.myapp",
       "supportsTablet": true,
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -59,6 +60,7 @@
           "kakaoAppKey": "19be534e574dc7e8d8b3b3f7b8a8306f"
         }
       ],
+      "expo-apple-authentication",
       "expo-secure-store"
     ],
     "experiments": {
