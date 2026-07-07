@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.whaledone.myapp",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/icons/whale1.png",
@@ -39,6 +40,7 @@
           }
         }
       ],
+      "./plugins/withKakaoMaven",
       "expo-router",
       [
         "expo-splash-screen",
@@ -59,7 +61,31 @@
           "kakaoAppKey": "19be534e574dc7e8d8b3b3f7b8a8306f"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "사진 업로드를 위해 사진첩 접근 권한이 필요합니다.",
+          "cameraPermission": "사진 촬영을 위해 카메라 접근 권한이 필요합니다.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "사진 촬영을 위해 카메라 접근 권한이 필요합니다.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "사진 업로드를 위해 사진첩 접근 권한이 필요합니다.",
+          "savePhotosPermission": "촬영한 사진을 저장하기 위해 사진첩 접근 권한이 필요합니다.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
