@@ -1,12 +1,13 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { supabase } from '@/src/lib/supabase';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -36,6 +37,15 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded, fontError]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        router.replace('/');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (!loaded && !fontError) {
     return null;
