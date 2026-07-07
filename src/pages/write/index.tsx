@@ -1,4 +1,3 @@
-import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   Keyboard,
@@ -17,7 +16,6 @@ import { CustomImagePicker } from '@/components/custom-image-picker';
 import { ImageGrid } from '@/components/image-grid';
 import { PostSettingsBottomSheet } from '@/components/post-settings-bottom-sheet';
 import AIIcon from '@/components/icons/ai-icon';
-import UnlockIcon from '@/components/icons/unlock-icon';
 import UnorderedListIcon from '@/components/icons/unordered-list-icon';
 import UploadIcon from '@/components/icons/upload-icon';
 import { ThemedButton } from '@/components/themed-button';
@@ -39,7 +37,7 @@ const SAMPLE_RESPONSES = [
 ];
 
 export default function WritePage() {
-  const router = useRouter();
+
   const [text, setText] = useState('');
   const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
   const [isSheetVisible, setIsSheetVisible] = useState(false);
@@ -104,18 +102,14 @@ export default function WritePage() {
         <ThemedView style={styles.container}>
           {/* Topbar */}
           <View style={styles.topBar}>
-            <ThemedButton label="취소" variant="ghost" onPress={() => router.back()} />
-            <View style={styles.topBarRight}>
-              <ThemedButton label="저장" variant="light" />
-              <ThemedButton
-                label="등록"
-                variant="dark"
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setIsSettingsVisible(true);
-                }}
-              />
-            </View>
+            <ThemedButton
+              label="등록"
+              variant="dark"
+              onPress={() => {
+                Keyboard.dismiss();
+                setIsSettingsVisible(true);
+              }}
+            />
           </View>
 
           <View style={styles.divider} />
@@ -157,7 +151,7 @@ export default function WritePage() {
                 <AIIcon width={34} height={20} fill={primary} />
               </Pressable>
             </View>
-            <UnlockIcon width={20} height={20} fill={gray} />
+            <ThemedButton label="저장" variant="ghost" />
           </View>
         </ThemedView>
       </KeyboardAvoidingView>
@@ -210,14 +204,10 @@ const styles = StyleSheet.create({
   },
   topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 70,
-  },
-  topBarRight: {
-    flexDirection: 'row',
-    gap: 10,
   },
   divider: {
     height: 1,
