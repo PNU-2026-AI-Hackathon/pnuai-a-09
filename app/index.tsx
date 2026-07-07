@@ -1,3 +1,4 @@
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -6,6 +7,7 @@ import {
   Image,
   ImageStyle,
   ImageSourcePropType,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -21,7 +23,6 @@ import { supabase } from '@/src/lib/supabase';
 import {
   confirmAuthenticatedUser,
   getPostLoginRoute,
-  signInAsTestUser,
   type PostLoginRoute,
 } from '@/src/services/onboarding';
 
@@ -116,15 +117,51 @@ export default function RootIndex() {
       return;
     }
 
+    if (Platform.OS !== 'ios') {
+      setLoginError('Apple 로그인은 iOS에서만 지원됩니다.');
+      return;
+    }
+
     setIsAuthLoading(true);
     setLoginError(null);
 
     try {
-      const user = await signInAsTestUser();
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      const identityToken = credential.identityToken;
+
+      if (!identityToken) {
+        throw new Error('Apple 로그인 결과에서 identityToken을 찾을 수 없습니다.');
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: identityToken,
+      });
+
+      if (signInError) {
+        throw signInError;
+      }
+
+      const user = await confirmAuthenticatedUser();
       const route = await getPostLoginRoute(user);
       navigateAfterLogin(route);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '테스트 유저 로그인 중 문제가 발생했습니다.';
+      // 사용자가 Apple 로그인 시트를 취소한 경우는 오류로 표시하지 않는다.
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as { code?: string }).code === 'ERR_REQUEST_CANCELED'
+      ) {
+        return;
+      }
+
+      const message = error instanceof Error ? error.message : 'Apple 로그인 중 문제가 발생했습니다.';
       setLoginError(message);
     } finally {
       setIsAuthLoading(false);
