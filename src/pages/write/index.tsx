@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -41,11 +41,13 @@ const SAMPLE_RESPONSES = [
 export default function WritePage() {
   const router = useRouter();
   const [text, setText] = useState('');
+  const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isPickerVisible, setIsPickerVisible] = useState(false);
   const [responseIndex, setResponseIndex] = useState(0);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const inputRef = useRef<TextInput>(null);
 
   const currentResponse = SAMPLE_RESPONSES[responseIndex];
 
@@ -66,6 +68,28 @@ export default function WritePage() {
   const handlePickerConfirm = (uris: string[]) => {
     setSelectedImages(uris.slice(0, 6));
     setIsPickerVisible(false);
+  };
+
+  const handleBulletList = () => {
+    const cursor = selection.start;
+    const lineStart = text.lastIndexOf('\n', cursor - 1) + 1;
+    const lineEnd = text.indexOf('\n', cursor);
+    const line = text.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+
+    let newText: string;
+    let newCursor: number;
+
+    if (line.startsWith('• ')) {
+      newText = text.slice(0, lineStart) + line.slice(2) + text.slice(lineStart + line.length);
+      newCursor = Math.max(lineStart, cursor - 2);
+    } else {
+      newText = text.slice(0, lineStart) + '• ' + line + text.slice(lineStart + line.length);
+      newCursor = cursor + 2;
+    }
+
+    setText(newText);
+    setSelection({ start: newCursor, end: newCursor });
+    inputRef.current?.focus();
   };
 
   const removeImage = (index: number) => {
@@ -104,6 +128,7 @@ export default function WritePage() {
               </View>
             )}
             <TextInput
+              ref={inputRef}
               style={styles.input}
               placeholder="내용을 입력하세요. (최대 400자)"
               placeholderTextColor={gray}
@@ -112,6 +137,8 @@ export default function WritePage() {
               textAlignVertical="top"
               value={text}
               onChangeText={setText}
+              selection={selection}
+              onSelectionChange={e => setSelection(e.nativeEvent.selection)}
             />
           </View>
 
@@ -123,7 +150,9 @@ export default function WritePage() {
               <Pressable onPress={() => setIsPickerVisible(true)} hitSlop={8}>
                 <UploadIcon width={20} height={20} fill={primary} />
               </Pressable>
-              <UnorderedListIcon width={20} height={20} fill={primary} />
+              <Pressable onPress={handleBulletList} hitSlop={8}>
+                <UnorderedListIcon width={20} height={20} fill={primary} />
+              </Pressable>
               <Pressable onPress={handleAIPress} hitSlop={8}>
                 <AIIcon width={34} height={20} fill={primary} />
               </Pressable>
