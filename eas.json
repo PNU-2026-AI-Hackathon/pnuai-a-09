@@ -17,7 +17,9 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://wrjeyohgbdtvmpxseruo.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_iqgj3VUQjCOLoL-dDZddow_ugjHl6Zd"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_iqgj3VUQjCOLoL-dDZddow_ugjHl6Zd",
+        "EXPO_PUBLIC_TEST_USER_EMAIL": "kimtaeran4767@gmail.com",
+        "EXPO_PUBLIC_TEST_USER_PASSWORD": "Xofks0828!"
       }
     },
     "production": {
@@ -25,7 +27,9 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://wrjeyohgbdtvmpxseruo.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_iqgj3VUQjCOLoL-dDZddow_ugjHl6Zd"
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_iqgj3VUQjCOLoL-dDZddow_ugjHl6Zd",
+        "EXPO_PUBLIC_TEST_USER_EMAIL": "kimtaeran4767@gmail.com",
+        "EXPO_PUBLIC_TEST_USER_PASSWORD": "Xofks0828!"
       }
     }
   },
