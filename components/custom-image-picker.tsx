@@ -28,12 +28,23 @@ interface Props {
   onClose: () => void;
   maxSelect?: number;
   initialSelectedUris?: string[];
+  /**
+   * true 면 확정 시 미디어 라이브러리 에셋을 읽기 가능한 로컬 파일(file://) URI 로 변환해 전달한다.
+   * (iOS 의 ph:// URI 는 파일 시스템/업로드에서 직접 읽을 수 없으므로 업로드가 필요한 화면에서 사용)
+   */
+  resolveLocalUri?: boolean;
 }
 
 type PhotoItem = { uri: string; id: string };
 type GridItem = { type: 'camera' } | { type: 'photo'; item: PhotoItem };
 
-export function CustomImagePicker({ onConfirm, onClose, maxSelect = 10, initialSelectedUris = [] }: Props) {
+export function CustomImagePicker({
+  onConfirm,
+  onClose,
+  maxSelect = 10,
+  initialSelectedUris = [],
+  resolveLocalUri = false,
+}: Props) {
   const insets = useSafeAreaInsets();
   const [mediaPermission, requestMediaPermission, getMediaPermission] = MediaLibrary.usePermissions();
 
@@ -138,11 +149,34 @@ export function CustomImagePicker({ onConfirm, onClose, maxSelect = 10, initialS
     });
   };
 
-  const handleConfirm = () => {
-    const uris = selectedIds
-      .map(id => photos.find(p => p.id === id)?.uri)
-      .filter((u): u is string => !!u);
-    onConfirm(uris);
+  const handleConfirm = async () => {
+    const selected = selectedIds
+      .map(id => ({ id, uri: photos.find(p => p.id === id)?.uri }))
+      .filter((s): s is { id: string; uri: string } => !!s.uri);
+
+    if (!resolveLocalUri) {
+      onConfirm(selected.map(s => s.uri));
+      return;
+    }
+
+    // 라이브러리 에셋(ph://)은 getAssetInfoAsync 로 읽기 가능한 localUri(file://)로 변환한다.
+    // 카메라 촬영본(cam_*)은 이미 file:// 이므로 그대로 사용.
+    const resolved = await Promise.all(
+      selected.map(async ({ id, uri }) => {
+        if (id.startsWith('cam_')) {
+          return uri;
+        }
+        try {
+          const info = await MediaLibrary.getAssetInfoAsync(id);
+          return info.localUri ?? uri;
+        } catch (e) {
+          console.warn('[CustomImagePicker] getAssetInfoAsync error', e);
+          return uri;
+        }
+      }),
+    );
+
+    onConfirm(resolved);
   };
 
   if (!mediaPermission) return null;

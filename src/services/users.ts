@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import type { ImageSourcePropType } from 'react-native';
 
 import { supabase } from '@/src/lib/supabase';
@@ -147,6 +148,40 @@ export async function fetchCurrentUser(): Promise<AppUser | null> {
   }
 
   return fetchUserById(user.id);
+}
+
+const PROFILE_IMAGE_CONTENT_TYPES: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+};
+
+/**
+ * 로컬 파일(file://) 이미지를 Supabase 'profiles' 버킷에 업로드하고 공개 URL 을 반환한다.
+ * React Native 에서는 Blob/File/FormData 업로드가 정상 동작하지 않으므로 바이트(Uint8Array)로 업로드한다.
+ * (localUri 는 반드시 읽기 가능한 file:// 여야 한다 — iOS 라이브러리의 ph:// 는 미리 변환 필요)
+ */
+export async function uploadProfileImage(userId: string, localUri: string): Promise<string> {
+  const bytes = await new File(localUri).bytes();
+
+  const rawExt = localUri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+  const ext = PROFILE_IMAGE_CONTENT_TYPES[rawExt] ? rawExt : 'jpg';
+  const contentType = PROFILE_IMAGE_CONTENT_TYPES[ext];
+  const path = `${userId}/${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage.from('profiles').upload(path, bytes, {
+    contentType,
+    upsert: true,
+  });
+
+  if (error) {
+    throw new Error(error.message ?? '프로필 이미지 업로드에 실패했습니다.');
+  }
+
+  return supabase.storage.from('profiles').getPublicUrl(path).data.publicUrl;
 }
 
 export async function fetchUserByTag(tag: string): Promise<AppUser | null> {

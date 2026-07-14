@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
+import { AddFriendModal } from "@/components/group/add-friend-modal";
 import { AnimatedWaveBackground } from "@/components/group/animated-wave-background";
 import { WaterDropDecoration } from "@/components/group/water-drop-decoration";
 import {
@@ -94,7 +95,7 @@ function createInitialMotion(
 
 function PlusIcon() {
   return (
-    <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
+    <Svg width={18} height={18} viewBox="0 0 12 12" fill="none">
       <Path
         d="M5.75 0.75L5.75 10.75M10.75 5.75L0.75 5.75"
         stroke={primary}
@@ -176,8 +177,9 @@ function FloatingWhale() {
 }
 
 export default function GroupPage() {
-  const { circleMembers } = useFriends();
+  const { circleMembers, currentUserId } = useFriends();
   const [selectedFriend, setSelectedFriend] = useState<AppUser | null>(null);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [playArea, setPlayArea] = useState<PlayArea>({ width: 0, height: 0 });
   const [whaleMotions, setWhaleMotions] = useState<Record<string, WhaleMotion>>(
     {},
@@ -391,26 +393,6 @@ export default function GroupPage() {
                   <Text style={styles.profileDescription} numberOfLines={3}>
                     {selectedFriend.description}
                   </Text>
-                  <View style={styles.statRow}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>
-                        {selectedFriend.friends_count}
-                      </Text>
-                      <Text style={styles.statLabel}>Friends</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>
-                        {selectedFriend.like_count}
-                      </Text>
-                      <Text style={styles.statLabel}>Like</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>
-                        {selectedFriend.post_count}
-                      </Text>
-                      <Text style={styles.statLabel}>Post</Text>
-                    </View>
-                  </View>
                 </View>
               </View>
             ) : null}
@@ -420,7 +402,7 @@ export default function GroupPage() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="친구초대"
-        onPress={noop}
+        onPress={() => setIsInviteOpen(true)}
         style={({ pressed }) => [
           styles.inviteButton,
           pressed && styles.inviteButtonPressed,
@@ -430,6 +412,11 @@ export default function GroupPage() {
           <PlusIcon />
         </View>
       </Pressable>
+      <AddFriendModal
+        visible={isInviteOpen}
+        currentUserId={currentUserId}
+        onClose={() => setIsInviteOpen(false)}
+      />
     </View>
   );
 }
@@ -523,8 +510,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   inviteIcon: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 30,
     backgroundColor: white,
     alignItems: "center",
@@ -564,7 +551,7 @@ const styles = StyleSheet.create({
   profileLeft: {
     width: 116,
     alignItems: "center",
-    paddingTop: 12,
+    paddingTop: 10,
   },
   profileImageFrame: {
     marginTop: 20,
@@ -594,49 +581,26 @@ const styles = StyleSheet.create({
   },
   profileRight: {
     flex: 1,
-    paddingTop: 18,
+    paddingTop: 40,
   },
   profileName: {
     color: "#000000",
     fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 18,
+    lineHeight: 20,
   },
   profileTag: {
     marginTop: 2,
     color: gray,
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 14,
+    lineHeight: 18,
   },
   profileDescription: {
     marginTop: 10,
     color: darkGray,
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 18,
-  },
-  statRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 18,
-    paddingRight: 6,
-  },
-  statItem: {
-    minWidth: 42,
-    alignItems: "center",
-  },
-  statValue: {
-    color: "#3C4446",
-    fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  statLabel: {
-    marginTop: 6,
-    color: "#9EA2A3",
-    fontFamily: FontFamily.pretendardRegular,
-    fontSize: 10,
-    lineHeight: 12,
   },
 });
