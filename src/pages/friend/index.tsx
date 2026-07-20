@@ -221,10 +221,24 @@ export default function FriendProfilePage() {
           <Text style={styles.description}>{displayDescription}</Text>
         ) : null}
 
-        <View style={styles.friendsRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="친구 목록 보기"
+          onPress={() =>
+            router.push({
+              pathname: '/(tabs)/home/friend-list',
+              params: {
+                userId: params.userId,
+                name: displayName,
+                count: String(friendsCount ?? user?.friends_count ?? ''),
+              },
+            })
+          }
+          hitSlop={6}
+          style={({ pressed }) => [styles.friendsRow, pressed && styles.pressed]}>
           <Text style={styles.friendsLabel}>친구</Text>
           <Text style={styles.friendsCount}>{friendsCount ?? user?.friends_count ?? 0}</Text>
-        </View>
+        </Pressable>
       </View>
 
       <View style={styles.sortRow}>

@@ -10,7 +10,8 @@ export default function HomeLayout() {
   const insets = useSafeAreaInsets();
   const segments = useSegments();
   const leaf = segments[segments.length - 1];
-  const shouldShowHeader = leaf !== 'notifications' && leaf !== 'friend';
+  const shouldShowHeader =
+    leaf !== 'notifications' && leaf !== 'friend' && leaf !== 'friend-list';
   const topPadding = shouldShowHeader ? insets.top : 0;
 
   return (
