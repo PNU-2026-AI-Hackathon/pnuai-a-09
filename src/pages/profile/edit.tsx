@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   BackHandler,
   Dimensions,
   FlatList,
@@ -56,8 +57,8 @@ const MAX_NICKNAME_LENGTH = 10;
 const MAX_DESCRIPTION_LENGTH = 100;
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CARD_WIDTH = Math.round(SCREEN_WIDTH * 0.55);
-const CARD_SPACING = 12;
+const CARD_WIDTH = Math.round(SCREEN_WIDTH * 0.5);
+const CARD_SPACING = 28;
 const ITEM_WIDTH = CARD_WIDTH + CARD_SPACING * 2;
 const SIDE_PADDING = Math.max(0, (SCREEN_WIDTH - ITEM_WIDTH) / 2);
 
@@ -97,6 +98,7 @@ export default function ProfileEditPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const carouselRef = useRef<FlatList<Character>>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
 
   const installedDays = getInstalledDays(currentUser.installed_at);
 
@@ -342,19 +344,36 @@ export default function ProfileEditPage() {
               showsHorizontalScrollIndicator={false}
               snapToInterval={ITEM_WIDTH}
               decelerationRate="fast"
-              contentContainerStyle={{ paddingHorizontal: SIDE_PADDING }}
+              contentContainerStyle={[styles.carouselContent, { paddingHorizontal: SIDE_PADDING }]}
+              scrollEventThrottle={16}
+              onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+                useNativeDriver: false,
+              })}
               onMomentumScrollEnd={handleCarouselScroll}
-              renderItem={({ item }) => {
+              extraData={selectedLevel}
+              renderItem={({ item, index }) => {
                 const unlocked = installedDays >= item.unlockDay;
                 const selected = selectedLevel === item.level;
+                const inputRange = [
+                  (index - 1) * ITEM_WIDTH,
+                  index * ITEM_WIDTH,
+                  (index + 1) * ITEM_WIDTH,
+                ];
+                const scale = scrollX.interpolate({
+                  inputRange,
+                  outputRange: [0.84, 1, 0.84],
+                  extrapolate: 'clamp',
+                });
 
                 return (
-                  <CharacterCard
-                    character={item}
-                    unlocked={unlocked}
-                    selected={selected}
-                    onSelect={() => setSelectedLevel(item.level)}
-                  />
+                  <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
+                    <CharacterCard
+                      character={item}
+                      unlocked={unlocked}
+                      selected={selected}
+                      onSelect={() => setSelectedLevel(item.level)}
+                    />
+                  </Animated.View>
                 );
               }}
             />
@@ -639,9 +658,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
     justifyContent: 'center',
   },
+  carouselContent: {
+    alignItems: 'flex-end',
+  },
+  cardWrap: {
+    transformOrigin: '50% 100%',
+  },
   card: {
     width: CARD_WIDTH,
     marginHorizontal: CARD_SPACING,
+    alignItems: 'center',
     borderRadius: 16,
     backgroundColor: white,
     paddingHorizontal: 16,
@@ -694,16 +720,15 @@ const styles = StyleSheet.create({
   },
   selectButton: {
     marginTop: 16,
-    height: 46,
+    width: 90,
+    height: 40,
     borderRadius: 23,
     backgroundColor: primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   selectButtonSelected: {
-    backgroundColor: white,
-    borderWidth: 1.5,
-    borderColor: primary,
+    backgroundColor: primary,
   },
   selectButtonLocked: {
     backgroundColor: '#C4C4C4',
@@ -715,7 +740,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   selectButtonTextSelected: {
-    color: primary,
+    color: white,
   },
   selectButtonTextLocked: {
     color: white,
@@ -729,10 +754,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   arrowLeft: {
-    left: 40,
+    left: 56,
   },
   arrowRight: {
-    right: 40,
+    right: 56,
   },
   dots: {
     marginTop: 20,
