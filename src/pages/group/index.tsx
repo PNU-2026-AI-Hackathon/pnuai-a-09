@@ -11,8 +11,10 @@ import {
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
+import { HomeHeader } from "@/components/home/home-header";
 import { AddFriendModal } from "@/components/group/add-friend-modal";
 import { AnimatedWaveBackground } from "@/components/group/animated-wave-background";
 import { WaterDropDecoration } from "@/components/group/water-drop-decoration";
@@ -306,8 +308,10 @@ export default function GroupPage() {
   }, [playArea, whaleMotions]);
 
   return (
-    <View style={styles.screen} onLayout={handleScreenLayout}>
-      <AnimatedWaveBackground style={styles.backgroundImage} />
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <HomeHeader active="group" />
+      <View style={styles.screen} onLayout={handleScreenLayout}>
+        <AnimatedWaveBackground style={styles.backgroundImage} />
       {playArea.width > 0 && playArea.height > 0 ? (
         <View style={styles.waterDropLayer} pointerEvents="none">
           <WaterDropDecoration width={playArea.width} height={playArea.height} />
@@ -440,11 +444,16 @@ export default function GroupPage() {
         currentUserId={currentUserId}
         onClose={() => setIsInviteOpen(false)}
       />
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: background,
+  },
   screen: {
     flex: 1,
     overflow: "hidden",

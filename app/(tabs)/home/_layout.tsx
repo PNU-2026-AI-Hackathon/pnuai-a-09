@@ -1,26 +1,16 @@
-import { Stack, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { HomeHeader } from '@/components/home/home-header';
 import { background } from '@/constants/theme';
 import { FriendsProvider } from '@/src/contexts/friends';
 
 export default function HomeLayout() {
-  const insets = useSafeAreaInsets();
-  const segments = useSegments();
-  const leaf = segments[segments.length - 1];
-  const shouldShowHeader =
-    leaf !== 'notifications' && leaf !== 'friend' && leaf !== 'friend-list';
-  const topPadding = shouldShowHeader ? insets.top : 0;
-
+  // 각 화면(피드/친구)이 자체적으로 헤더와 상단 세이프에어리어를 그린다.
+  // 레이아웃은 전체 화면을 차지하는 Stack만 감싸므로, 화면 전환 중 컨테이너가 변하지 않는다.
   return (
     <FriendsProvider>
-      <View style={[styles.root, { paddingTop: topPadding }]}>
-        {shouldShowHeader ? <HomeHeader /> : null}
-        <View style={styles.stackWrap}>
-          <Stack screenOptions={{ headerShown: false }} />
-        </View>
+      <View style={styles.root}>
+        <Stack screenOptions={{ headerShown: false }} />
       </View>
     </FriendsProvider>
   );
@@ -30,8 +20,5 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: background,
-  },
-  stackWrap: {
-    flex: 1,
   },
 });

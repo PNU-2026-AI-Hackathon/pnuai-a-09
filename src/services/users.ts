@@ -227,6 +227,40 @@ export async function uploadCoverImage(userId: string, localUri: string): Promis
   return supabase.storage.from('profiles').getPublicUrl(path).data.publicUrl;
 }
 
+/** 프로필 이미지를 업로드 후 profiles.profile_image_url 에 저장하고, 저장된 공개 URL 을 반환한다. */
+export async function saveProfileImage(userId: string, localUri: string): Promise<string> {
+  const url = await uploadProfileImage(userId, localUri);
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      profile_image_url: url,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    throw new Error(error.message ?? '프로필 이미지 저장에 실패했습니다.');
+  }
+
+  return url;
+}
+
+/** 선택한 캐릭터(친밀도 단계)를 profiles.intimacy_level 에 저장한다. */
+export async function updateSelectedCharacterLevel(userId: string, level: number): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      intimacy_level: level,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    throw new Error(error.message ?? '캐릭터 저장에 실패했습니다.');
+  }
+}
+
 /** 커버 이미지를 갤러리에서 골라 업로드 후 내 프로필(profiles.cover_image_url)에 저장하고, 저장된 공개 URL 을 반환한다. */
 export async function saveCoverImage(userId: string, localUri: string): Promise<string> {
   const coverImageUrl = await uploadCoverImage(userId, localUri);

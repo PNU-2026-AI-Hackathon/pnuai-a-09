@@ -118,6 +118,7 @@ export default function ProfilePage() {
   const insets = useSafeAreaInsets();
   const [currentUser, setCurrentUser] = useState<AppUser>(emptyProfile);
   const [friendsCount, setFriendsCount] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
   // 방금 고른 커버(로컬 미리보기). 저장 성공 시 currentUser.cover_image_url 로 대체된다.
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -149,6 +150,11 @@ export default function ProfilePage() {
         })
         .catch((error) => {
           console.warn('[profile] Failed to load user', error);
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
         });
 
       return () => {
@@ -225,6 +231,14 @@ export default function ProfilePage() {
       setIsSigningOut(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.screen, styles.centered]}>
+        <ActivityIndicator color={gray} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -357,6 +371,10 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: background,
+  },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   content: {
     paddingBottom: 80,
