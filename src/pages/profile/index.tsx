@@ -1,17 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { PencilIcon } from '@/components/icons/pencil-icon';
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
 import { background, darkGray, FontFamily, gray, lightGray, primary, white } from '@/constants/theme';
+import { fetchAcceptedFriendIds } from '@/src/services/friends';
 import { signOutUser } from '@/src/services/onboarding';
-import { AppUser, fetchCurrentUser } from '@/src/services/users';
+import { AppUser, fetchCurrentUser, saveCoverImage } from '@/src/services/users';
 
 const whaleImage = require('../../../assets/icons/whale1.png');
 const friendsCheerImage = require('../../../assets/icons/friends_cheer.png');
@@ -29,6 +31,7 @@ const emptyProfile: AppUser = {
   post_count: 0,
 };
 const NEXT_LEVEL_DAYS = 31;
+const COVER_BODY_HEIGHT = 150;
 
 function getInstalledDays(installedAt: string) {
   const installedDate = new Date(installedAt);
@@ -112,9 +115,15 @@ function StatCard({
 
 export default function ProfilePage() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [currentUser, setCurrentUser] = useState<AppUser>(emptyProfile);
+  const [friendsCount, setFriendsCount] = useState<number | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  // 방금 고른 커버(로컬 미리보기). 저장 성공 시 currentUser.cover_image_url 로 대체된다.
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [isSavingCover, setIsSavingCover] = useState(false);
   const installedDays = getInstalledDays(currentUser.installed_at);
+  const coverImageUri = coverPreview ?? currentUser.cover_image_url ?? null;
 
   useFocusEffect(
     useCallback(() => {
@@ -122,9 +131,21 @@ export default function ProfilePage() {
 
       fetchCurrentUser()
         .then((user) => {
-          if (isMounted && user) {
-            setCurrentUser(user);
+          if (!isMounted || !user) {
+            return;
           }
+
+          setCurrentUser(user);
+
+          fetchAcceptedFriendIds(user.id)
+            .then((ids) => {
+              if (isMounted) {
+                setFriendsCount(ids.length);
+              }
+            })
+            .catch((error) => {
+              console.warn('[profile] Failed to load friends count', error);
+            });
         })
         .catch((error) => {
           console.warn('[profile] Failed to load user', error);
@@ -135,6 +156,58 @@ export default function ProfilePage() {
       };
     }, []),
   );
+
+  const handlePickCover = useCallback(async () => {
+    if (!currentUser.id || isSavingCover) {
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.9,
+    });
+
+    if (result.canceled || result.assets.length === 0) {
+      return;
+    }
+
+    const localUri = result.assets[0].uri;
+    const previous = coverPreview;
+    setCoverPreview(localUri); // 즉시 미리보기
+    setIsSavingCover(true);
+
+    try {
+      const savedUrl = await saveCoverImage(currentUser.id, localUri);
+      setCurrentUser((prev) => ({ ...prev, cover_image_url: savedUrl }));
+      setCoverPreview(savedUrl);
+    } catch (error) {
+      console.warn('[profile] Failed to save cover image', error);
+      setCoverPreview(previous); // 실패 시 이전 상태로 롤백
+      Alert.alert('저장 실패', '커버 이미지를 저장하지 못했어요. 다시 시도해 주세요.');
+    } finally {
+      setIsSavingCover(false);
+    }
+  }, [coverPreview, currentUser.id, isSavingCover]);
+
+  const handleOpenFriendList = () => {
+    if (!currentUser.id) {
+      return;
+    }
+
+    router.push({
+      pathname: '/(tabs)/home/friend-list',
+      params: {
+        userId: currentUser.id,
+        name: currentUser.name,
+        count: String(friendsCount ?? ''),
+      },
+    });
+  };
 
   const handleLogout = async () => {
     if (isSigningOut) {
@@ -154,7 +227,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <View style={styles.screen}>
       <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.content}
@@ -162,56 +235,58 @@ export default function ProfilePage() {
         bounces={false}
         alwaysBounceVertical={false}
         overScrollMode="never">
-        <View style={styles.hero}>
-          <View style={styles.topIcons}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="배경 사진 변경"
+          onPress={handlePickCover}
+          disabled={isSavingCover}
+          style={[styles.cover, { height: insets.top + COVER_BODY_HEIGHT }]}>
+          {coverImageUri ? (
+            <Image source={{ uri: coverImageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.coverEmpty]} />
+          )}
+          {isSavingCover ? (
+            <View style={[StyleSheet.absoluteFill, styles.coverLoading]}>
+              <ActivityIndicator size="large" color={white} />
+            </View>
+          ) : null}
+        </Pressable>
+
+        <View style={styles.profileSection}>
+          <View style={styles.avatarWrap}>
+            <Image source={currentUser.profile_image} style={styles.avatar} contentFit="cover" />
+          </View>
+
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {currentUser.name}
+            </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="알림"
-              onPress={() => router.push('/(tabs)/profile/notifications')}
-              style={({ pressed }) => [styles.iconHit, pressed && styles.iconPressed]}>
-              <Ionicons name="notifications-outline" size={22} color={darkGray} />
+              accessibilityLabel="프로필 편집"
+              hitSlop={8}
+              onPress={() => router.push('/(tabs)/profile/edit')}
+              style={({ pressed }) => pressed && styles.pressed}>
+              <PencilIcon size={15} color={darkGray} />
             </Pressable>
-            <View style={styles.iconHit}>
-              <Ionicons name="settings-outline" size={22} color={darkGray} />
-            </View>
           </View>
+          <Text style={styles.tag} numberOfLines={1}>
+            @{currentUser.tag}
+          </Text>
+          {currentUser.description ? (
+            <Text style={styles.description}>{currentUser.description}</Text>
+          ) : null}
 
-          <View style={styles.heroContent}>
-            <View style={styles.profileTopRow}>
-              <View style={styles.profileImageWrap}>
-                <Image source={currentUser.profile_image} style={styles.profileImage} contentFit="cover" />
-              </View>
-
-              <View style={styles.profileDescriptionWrap}>
-                <View style={styles.descriptionBubble}>
-                  <Text style={styles.descriptionText}>{currentUser.description}</Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="프로필 편집"
-                  onPress={() => router.push('/(tabs)/profile/edit')}
-                  style={({ pressed }) => pressed && styles.editPressed}>
-                  <Text style={styles.editText}>Edit</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.profileStatsRow}>
-              <View style={styles.profileNameBlock}>
-                <Text style={styles.name}>{currentUser.name}</Text>
-                <Text style={styles.tag}>@{currentUser.tag}</Text>
-              </View>
-              <View style={styles.followItem}>
-                <Text style={styles.followValue}>0</Text>
-                <Text style={styles.followLabel}>Follower</Text>
-              </View>
-              <View style={styles.followDivider} />
-              <View style={styles.followItem}>
-                <Text style={styles.followValue}>0</Text>
-                <Text style={styles.followLabel}>Following</Text>
-              </View>
-            </View>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="친구 목록 보기"
+            onPress={handleOpenFriendList}
+            hitSlop={6}
+            style={({ pressed }) => [styles.friendsRow, pressed && styles.pressed]}>
+            <Text style={styles.friendsLabel}>친구</Text>
+            <Text style={styles.friendsCount}>{friendsCount ?? currentUser.friends_count ?? 0}</Text>
+          </Pressable>
         </View>
 
         <View style={styles.streakSection}>
@@ -258,15 +333,27 @@ export default function ProfilePage() {
           <Text style={styles.logoutText}>{isSigningOut ? '로그아웃 중...' : '로그아웃'}</Text>
         </Pressable>
       </ScrollView>
-    </SafeAreaView>
+
+      <View style={[styles.topIcons, { top: insets.top + 4 }]} pointerEvents="box-none">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="알림"
+          onPress={() => router.push('/(tabs)/profile/notifications')}
+          style={({ pressed }) => [styles.iconHit, pressed && styles.iconPressed]}>
+          <Ionicons name="notifications-outline" size={22} color={darkGray} />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="설정"
+          style={({ pressed }) => [styles.iconHit, pressed && styles.iconPressed]}>
+          <Ionicons name="settings-outline" size={22} color={darkGray} />
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#AFE7FF',
-  },
   screen: {
     flex: 1,
     backgroundColor: background,
@@ -274,15 +361,21 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 80,
   },
-  hero: {
-    minHeight: 352,
-    backgroundColor: '#AFE7FF',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+  cover: {
+    width: '100%',
+  },
+  coverEmpty: {
+    backgroundColor: lightGray,
+  },
+  coverLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   topIcons: {
+    position: 'absolute',
+    right: 16,
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 12,
   },
@@ -292,108 +385,77 @@ const styles = StyleSheet.create({
   iconPressed: {
     opacity: 0.7,
   },
-  heroContent: {
+  profileSection: {
+    backgroundColor: background,
     paddingHorizontal: 20,
-    paddingTop: 34,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
-  profileTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+  avatarWrap: {
+    marginTop: -46,
   },
-  profileImageWrap: {
-    width: 88,
-    alignItems: 'center',
-  },
-  profileImage: {
+  avatar: {
     width: 78,
     height: 78,
-    borderRadius: 37,
+    borderRadius: 39,
+    borderWidth: 3,
+    borderColor: white,
+    backgroundColor: white,
+  },
+  nameRow: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   name: {
+    color: '#000000',
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  tag: {
+    marginTop: 4,
+    color: gray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  description: {
+    marginTop: 12,
+    color: darkGray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  friendsRow: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'flex-start',
+  },
+  friendsLabel: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  friendsCount: {
     color: darkGray,
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 14,
-    lineHeight: 16,
-  },
-  tag: {
-    marginTop: 3,
-    left: 4,
-    color: '#777777',
-    fontFamily: FontFamily.pretendardRegular,
-    fontSize: 11,
-    lineHeight: 12,
-  },
-  profileDescriptionWrap: {
-    flex: 1,
-    paddingTop: 8,
-  },
-  descriptionBubble: {
-    minHeight: 60,
-    borderRadius: 5,
-    backgroundColor: white,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    shadowColor: lightGray,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  descriptionText: {
-    color: darkGray,
-    fontFamily: FontFamily.pretendardRegular,
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  editText: {
-    marginTop: 8,
-    alignSelf: 'flex-end',
-    color: '#777777',
-    fontFamily: FontFamily.pretendardMedium,
-    fontSize: 11,
-  },
-  editPressed: {
-    opacity: 0.7,
-  },
-  profileStatsRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  profileNameBlock: {
-    width: 88,
-    alignItems: 'center',
-  },
-  followItem: {
-    alignItems: 'center',
-    minWidth: 72,
-  },
-  followValue: {
-    color: darkGray,
-    fontFamily: FontFamily.pretendardMedium,
-    fontSize: 16,
     lineHeight: 18,
   },
-  followLabel: {
-    marginTop: 5,
-    color: '#777777',
-    fontFamily: FontFamily.pretendardRegular,
-    fontSize: 10,
-  },
-  followDivider: {
-    width: 0.5,
-    height: 32,
-    backgroundColor: gray,
+  pressed: {
+    opacity: 0.6,
   },
   streakSection: {
-    marginTop: -100,
-    borderTopLeftRadius: 42,
-    borderTopRightRadius: 42,
     backgroundColor: background,
-    paddingTop: 30,
+    paddingTop: 24,
     paddingHorizontal: 30,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E8ECEE',
   },
   sectionTitle: {
     color: darkGray,
