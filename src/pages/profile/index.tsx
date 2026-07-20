@@ -200,7 +200,7 @@ export default function ProfilePage() {
     }
 
     router.push({
-      pathname: '/(tabs)/home/friend-list',
+      pathname: '/(tabs)/profile/friend-list',
       params: {
         userId: currentUser.id,
         name: currentUser.name,
@@ -454,8 +454,8 @@ const styles = StyleSheet.create({
     backgroundColor: background,
     paddingTop: 24,
     paddingHorizontal: 30,
-    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E8ECEE',
+    borderTopWidth: 2,
   },
   sectionTitle: {
     color: darkGray,

@@ -1,4 +1,4 @@
-import { Slot, useSegments } from 'expo-router';
+import { Stack, useSegments } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,7 +19,7 @@ export default function HomeLayout() {
       <View style={[styles.root, { paddingTop: topPadding }]}>
         {shouldShowHeader ? <HomeHeader /> : null}
         <View style={styles.stackWrap}>
-          <Slot />
+          <Stack screenOptions={{ headerShown: false }} />
         </View>
       </View>
     </FriendsProvider>

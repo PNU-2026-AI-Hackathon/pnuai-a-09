@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useLocalSearchParams, useSegments } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Dimensions,
   FlatList,
   ListRenderItem,
   Pressable,
@@ -13,9 +15,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { darkGray, FontFamily, gray, lightGray, primary, white } from '@/constants/theme';
-import { useFriends } from '@/src/contexts/friends';
+import { background, darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
+import { supabase } from '@/src/lib/supabase';
 import {
+  cancelFriendRequest,
   fetchRelationStatuses,
   fetchAcceptedFriendsForUser,
   sendFriendRequest,
@@ -23,21 +26,42 @@ import {
 } from '@/src/services/friends';
 import type { AppUser } from '@/src/services/users';
 
+type RowMenu = { userId: string; top: number; right: number };
+
 export default function FriendListPage() {
   const params = useLocalSearchParams<{
     userId: string;
     name?: string;
     count?: string;
   }>();
-  const { currentUserId } = useFriends();
+  const segments = useSegments();
+  // 현재 어느 탭 스택에서 열렸는지 판단해, 같은 탭 안에서 이동(뒤로가기 스택 유지)한다.
+  const tab = (segments as string[]).includes('profile') ? 'profile' : 'home';
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [friends, setFriends] = useState<AppUser[]>([]);
   const [statuses, setStatuses] = useState<Record<string, FriendRelationStatus>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [pendingIds, setPendingIds] = useState<Record<string, boolean>>({});
+  const [menu, setMenu] = useState<RowMenu | null>(null);
+  const menuButtonRefs = useRef<Record<string, View | null>>({});
 
   const initialCount = params.count ? Number(params.count) : null;
   const count = isLoading && initialCount != null ? initialCount : friends.length;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (isMounted) {
+        setCurrentUserId(data.user?.id ?? null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const userId = params.userId;
@@ -92,7 +116,6 @@ export default function FriendListPage() {
       }
 
       setPendingIds((current) => ({ ...current, [userId]: true }));
-      // 낙관적 업데이트: 버튼을 즉시 '요청됨'으로 전환
       setStatuses((current) => ({ ...current, [userId]: 'requested' }));
 
       try {
@@ -111,17 +134,76 @@ export default function FriendListPage() {
     [currentUserId, pendingIds],
   );
 
-  const handleVisit = useCallback((friend: AppUser) => {
-    router.push({
-      pathname: '/(tabs)/home/friend',
-      params: {
-        userId: friend.id,
-        name: friend.name,
-        tag: friend.tag,
-        description: friend.description,
-      },
+  const handleCancelRequest = useCallback(
+    async (userId: string) => {
+      if (!currentUserId || pendingIds[userId]) {
+        return;
+      }
+
+      setPendingIds((current) => ({ ...current, [userId]: true }));
+      // 낙관적 업데이트: 버튼을 즉시 '추가' 가능 상태로 되돌린다.
+      setStatuses((current) => ({ ...current, [userId]: 'none' }));
+
+      try {
+        await cancelFriendRequest(currentUserId, userId);
+      } catch (error) {
+        console.warn('[friend-list] Failed to cancel request', error);
+        setStatuses((current) => ({ ...current, [userId]: 'requested' }));
+      } finally {
+        setPendingIds((current) => {
+          const next = { ...current };
+          delete next[userId];
+          return next;
+        });
+      }
+    },
+    [currentUserId, pendingIds],
+  );
+
+  const handleVisit = useCallback(
+    (friend: AppUser) => {
+      router.push({
+        pathname: tab === 'profile' ? '/(tabs)/profile/friend' : '/(tabs)/home/friend',
+        params: {
+          userId: friend.id,
+          name: friend.name,
+          tag: friend.tag,
+          description: friend.description,
+        },
+      });
+    },
+    [tab],
+  );
+
+  const openMenu = useCallback((userId: string) => {
+    const node = menuButtonRefs.current[userId];
+    if (!node) {
+      return;
+    }
+
+    node.measureInWindow((x, y, width, height) => {
+      const screenWidth = Dimensions.get('window').width;
+      setMenu({ userId, top: y + height + 4, right: screenWidth - (x + width) });
     });
   }, []);
+
+  const handleBlock = (userId: string) => {
+    setMenu(null);
+    const target = friends.find((friend) => friend.id === userId);
+    Alert.alert('차단', `${target?.name ?? '이 사용자'}님을 차단할까요?`, [
+      { text: '취소', style: 'cancel' },
+      { text: '차단', style: 'destructive', onPress: () => undefined },
+    ]);
+  };
+
+  const handleReport = (userId: string) => {
+    setMenu(null);
+    const target = friends.find((friend) => friend.id === userId);
+    Alert.alert('신고', `${target?.name ?? '이 사용자'}님을 신고할까요?`, [
+      { text: '취소', style: 'cancel' },
+      { text: '신고', style: 'destructive', onPress: () => undefined },
+    ]);
+  };
 
   const renderItem: ListRenderItem<AppUser> = ({ item }) => {
     const isSelf = currentUserId != null && currentUserId === item.id;
@@ -144,14 +226,39 @@ export default function FriendListPage() {
             </Text>
           </View>
         </Pressable>
-        {isSelf ? null : <ActionButton status={status} onAdd={() => handleAdd(item.id)} />}
+
+        {isSelf ? null : (
+          <ActionButton
+            status={status}
+            onAdd={() => handleAdd(item.id)}
+            onCancel={() => handleCancelRequest(item.id)}
+          />
+        )}
+
+        {isSelf ? null : (
+          <View
+            ref={(node) => {
+              menuButtonRefs.current[item.id] = node;
+            }}
+            collapsable={false}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="더보기"
+              hitSlop={8}
+              onPress={() => (menu?.userId === item.id ? setMenu(null) : openMenu(item.id))}
+              style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]}>
+              <Ionicons name="ellipsis-vertical" size={20} color={gray} />
+            </Pressable>
+          </View>
+        )}
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View style={styles.header}>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="뒤로가기"
@@ -161,7 +268,7 @@ export default function FriendListPage() {
           <Ionicons name="chevron-back" size={26} color={darkGray} />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {params.name ?? ''}
+          친구 목록
         </Text>
         <View style={styles.headerSide} />
       </View>
@@ -172,6 +279,7 @@ export default function FriendListPage() {
         renderItem={renderItem}
         ListHeaderComponent={<Text style={styles.countLabel}>{count}명</Text>}
         contentContainerStyle={styles.listContent}
+        scrollEnabled={menu === null}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyBox}>
@@ -183,11 +291,45 @@ export default function FriendListPage() {
           </View>
         }
       />
-    </SafeAreaView>
+      </SafeAreaView>
+
+      {menu ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="메뉴 닫기"
+            style={styles.menuBackdrop}
+            onPress={() => setMenu(null)}
+          />
+          <View style={[styles.menu, { top: menu.top, right: menu.right }]}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => handleBlock(menu.userId)}
+              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}>
+              <Text style={styles.menuText}>차단</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => handleReport(menu.userId)}
+              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}>
+              <Text style={[styles.menuText, styles.menuTextDanger]}>신고</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
+    </View>
   );
 }
 
-function ActionButton({ status, onAdd }: { status: FriendRelationStatus; onAdd: () => void }) {
+function ActionButton({
+  status,
+  onAdd,
+  onCancel,
+}: {
+  status: FriendRelationStatus;
+  onAdd: () => void;
+  onCancel: () => void;
+}) {
   if (status === 'friend') {
     return (
       <View style={[styles.actionButton, styles.friendButton]}>
@@ -197,10 +339,15 @@ function ActionButton({ status, onAdd }: { status: FriendRelationStatus; onAdd: 
   }
 
   if (status === 'requested') {
+    // '요청됨' 상태에서 한 번 더 누르면 보낸 친구 요청을 취소한다.
     return (
-      <View style={[styles.actionButton, styles.requestedButton]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="친구 요청 취소"
+        onPress={onCancel}
+        style={({ pressed }) => [styles.actionButton, styles.requestedButton, pressed && styles.pressed]}>
         <Text style={[styles.actionText, styles.requestedText]}>요청됨</Text>
-      </View>
+      </Pressable>
     );
   }
 
@@ -224,6 +371,10 @@ function ActionButton({ status, onAdd }: { status: FriendRelationStatus; onAdd: 
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: white,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: white,
@@ -327,6 +478,49 @@ const styles = StyleSheet.create({
   },
   requestedText: {
     color: darkGray,
+  },
+  moreButton: {
+    width: 28,
+    height: 34,
+    marginLeft: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+  },
+  menu: {
+    position: 'absolute',
+    minWidth: 104,
+    backgroundColor: white,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 21,
+  },
+  menuItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  menuItemPressed: {
+    backgroundColor: background,
+  },
+  menuText: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  menuTextDanger: {
+    color: red,
   },
   emptyBox: {
     paddingTop: 60,

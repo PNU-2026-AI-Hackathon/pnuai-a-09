@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useSegments } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,7 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { background, darkGray, FontFamily, gray, lightGray, white } from '@/constants/theme';
-import { useFriends } from '@/src/contexts/friends';
+import { supabase } from '@/src/lib/supabase';
 import { FeedPostCard } from '@/src/pages/feed/post-card';
 import { fetchAcceptedFriendIds } from '@/src/services/friends';
 import {
@@ -41,8 +41,11 @@ export default function FriendProfilePage() {
     description?: string;
   }>();
   const insets = useSafeAreaInsets();
-  const { currentUserId } = useFriends();
+  const segments = useSegments();
+  // 어느 탭 스택에서 열렸는지 판단해, 같은 탭 안에서 이동(뒤로가기 스택 유지)한다.
+  const tab = (segments as string[]).includes('profile') ? 'profile' : 'home';
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
   const [friendsCount, setFriendsCount] = useState<number | null>(null);
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -61,6 +64,20 @@ export default function FriendProfilePage() {
   const displayName = user?.name ?? params.name ?? '';
   const displayTag = user?.tag ?? params.tag ?? '';
   const displayDescription = user?.description ?? params.description ?? '';
+
+  useEffect(() => {
+    let isMounted = true;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (isMounted) {
+        setCurrentUserId(data.user?.id ?? null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     const userId = params.userId;
@@ -226,7 +243,7 @@ export default function FriendProfilePage() {
           accessibilityLabel="친구 목록 보기"
           onPress={() =>
             router.push({
-              pathname: '/(tabs)/home/friend-list',
+              pathname: tab === 'profile' ? '/(tabs)/profile/friend-list' : '/(tabs)/home/friend-list',
               params: {
                 userId: params.userId,
                 name: displayName,
