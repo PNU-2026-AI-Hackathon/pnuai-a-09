@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -178,7 +178,14 @@ function FloatingWhale() {
 
 export default function GroupPage() {
   const router = useRouter();
-  const { circleMembers, currentUserId } = useFriends();
+  const { circleMembers, currentUserId, reload } = useFriends();
+
+  // 친구 화면에 들어올 때마다 최신 친구 목록을 다시 불러온다 (수락/추가 직후 반영).
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
   const [selectedFriend, setSelectedFriend] = useState<AppUser | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [playArea, setPlayArea] = useState<PlayArea>({ width: 0, height: 0 });

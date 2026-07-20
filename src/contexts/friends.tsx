@@ -1,4 +1,4 @@
-import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import {
   buildFeedUserIds,
@@ -14,6 +14,8 @@ type FriendsContextValue = {
   feedUserIds: string[];
   currentUserId: string | null;
   isLoading: boolean;
+  /** 친구/유저 정보를 다시 불러온다 (친구 수락/추가 후 화면 갱신용). */
+  reload: () => Promise<void>;
 };
 
 const FriendsContext = createContext<FriendsContextValue | null>(null);
@@ -25,59 +27,39 @@ export function FriendsProvider({ children }: PropsWithChildren) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
+  const reload = useCallback(async () => {
+    try {
+      const user = await fetchCurrentUser();
 
-    fetchCurrentUser()
-      .then(async (user) => {
-        if (!user) {
-          return {
-            user: null as AppUser | null,
-            nextFriends: [] as AppUser[],
-            nextFeedUserIds: [] as string[],
-          };
-        }
+      if (!user) {
+        setCurrentUser(null);
+        setCurrentUserId(null);
+        setFriends([]);
+        setFeedUserIds([]);
+        return;
+      }
 
-        const nextFriends = await fetchAcceptedFriendsForUser(user.id);
+      const nextFriends = await fetchAcceptedFriendsForUser(user.id);
 
-        return {
-          user,
-          nextFriends,
-          nextFeedUserIds: buildFeedUserIds(
-            user.id,
-            nextFriends.map((friend) => friend.id),
-          ),
-        };
-      })
-      .then(({ user, nextFriends, nextFeedUserIds }) => {
-        if (!isMounted) {
-          return;
-        }
-
-        setCurrentUser(user);
-        setCurrentUserId(user?.id ?? null);
-        setFriends(nextFriends);
-        setFeedUserIds(nextFeedUserIds);
-      })
-      .catch((error) => {
-        console.warn('[friends] Failed to load friends', error);
-        if (isMounted) {
-          setCurrentUser(null);
-          setCurrentUserId(null);
-          setFriends([]);
-          setFeedUserIds([]);
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
+      setCurrentUser(user);
+      setCurrentUserId(user.id);
+      setFriends(nextFriends);
+      setFeedUserIds(
+        buildFeedUserIds(
+          user.id,
+          nextFriends.map((friend) => friend.id),
+        ),
+      );
+    } catch (error) {
+      console.warn('[friends] Failed to load friends', error);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const circleMembers = useMemo(() => {
     if (!currentUser) {
@@ -95,8 +77,9 @@ export function FriendsProvider({ children }: PropsWithChildren) {
       feedUserIds,
       currentUserId,
       isLoading,
+      reload,
     }),
-    [circleMembers, currentUser, currentUserId, feedUserIds, friends, isLoading],
+    [circleMembers, currentUser, currentUserId, feedUserIds, friends, isLoading, reload],
   );
 
   return <FriendsContext.Provider value={value}>{children}</FriendsContext.Provider>;
