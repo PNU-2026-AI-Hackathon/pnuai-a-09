@@ -30,6 +30,8 @@ import { useFriends } from "@/src/contexts/friends";
 import type { AppUser } from "@/src/services/users";
 const whaleCharacter = require("../../../assets/icons/whale1.png");
 const whaleGradation = require("../../../assets/icons/gradation.png");
+const fullWhaleImage = require("../../../assets/icons/full_whale.png");
+const MAX_FRIENDS = 20;
 const MEMBER_CARD_WIDTH = 123;
 const MEMBER_CARD_HEIGHT = 104;
 const BOUNCE_PADDING = {
@@ -180,7 +182,7 @@ function FloatingWhale() {
 
 export default function GroupPage() {
   const router = useRouter();
-  const { circleMembers, currentUserId, reload } = useFriends();
+  const { friends, circleMembers, currentUserId, reload } = useFriends();
 
   // 친구 화면에 들어올 때마다 최신 친구 목록을 다시 불러온다 (수락/추가 직후 반영).
   useFocusEffect(
@@ -190,6 +192,7 @@ export default function GroupPage() {
   );
   const [selectedFriend, setSelectedFriend] = useState<AppUser | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isCapacityOpen, setIsCapacityOpen] = useState(false);
   const [playArea, setPlayArea] = useState<PlayArea>({ width: 0, height: 0 });
   const [whaleMotions, setWhaleMotions] = useState<Record<string, WhaleMotion>>(
     {},
@@ -429,7 +432,13 @@ export default function GroupPage() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="친구초대"
-        onPress={() => setIsInviteOpen(true)}
+        onPress={() => {
+          if (friends.length >= MAX_FRIENDS) {
+            setIsCapacityOpen(true);
+          } else {
+            setIsInviteOpen(true);
+          }
+        }}
         style={({ pressed }) => [
           styles.inviteButton,
           pressed && styles.inviteButtonPressed,
@@ -444,6 +453,38 @@ export default function GroupPage() {
         currentUserId={currentUserId}
         onClose={() => setIsInviteOpen(false)}
       />
+      <Modal
+        visible={isCapacityOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCapacityOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.capacityCard}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+              onPress={() => setIsCapacityOpen(false)}
+              hitSlop={8}
+              style={styles.closeButton}
+            >
+              <CloseIcon />
+            </Pressable>
+            <View style={styles.capacityWhaleWrap}>
+              <Image
+                source={fullWhaleImage}
+                style={styles.capacityWhale}
+                contentFit="contain"
+              />
+              <Text style={styles.capacityHint}>꽉낀다..</Text>
+            </View>
+            <Text style={styles.capacityTitle}>친구 목록이 꽉 찼어요!</Text>
+            <Text style={styles.capacitySubtitle}>
+              최대 {MAX_FRIENDS}명까지 추가할 수 있어요.
+            </Text>
+          </View>
+        </View>
+      </Modal>
       </View>
     </SafeAreaView>
   );
@@ -575,6 +616,50 @@ const styles = StyleSheet.create({
     height: 24,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 1,
+  },
+  capacityCard: {
+    width: "100%",
+    maxWidth: 340,
+    borderRadius: 16,
+    backgroundColor: white,
+    paddingTop: 22,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    alignItems: "center",
+  },
+  capacityWhaleWrap: {
+    marginTop: 6,
+    width: "100%",
+    height: 140,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  capacityWhale: {
+    width: 160,
+    height: 118,
+  },
+  capacityHint: {
+    position: "absolute",
+    right: 48,
+    top: 42,
+    color: gray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  capacityTitle: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 18,
+    lineHeight: 26,
+  },
+  capacitySubtitle: {
+    marginTop: 2,
+    color: darkGray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 14,
+    lineHeight: 20,
   },
   profileContent: {
     flexDirection: "row",
