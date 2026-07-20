@@ -1,20 +1,33 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
 import { background, darkGray, FontFamily, FontSize, gray, lightGray, primary, white } from '@/constants/theme';
-import { fetchDiaryArchiveByUserId, type DiaryCategory, type DiaryEntry } from '@/src/services/diary';
+import {
+  createDiaryCategory,
+  fetchDiaryArchiveByUserId,
+  type DiaryCategory,
+  type DiaryEntry,
+} from '@/src/services/diary';
 import { fetchCurrentUser } from '@/src/services/users';
+
+const MAX_CATEGORY_NAME_LENGTH = 20;
 
 const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTH_LABELS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -76,6 +89,11 @@ export default function DiaryPage() {
   const [failedCategoryImages, setFailedCategoryImages] = useState<Record<string, boolean>>({});
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [diaryCategories, setDiaryCategories] = useState<DiaryCategory[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   const weeks = useMemo(() => getCalendarWeeks(selectedYear, selectedMonth), [selectedMonth, selectedYear]);
   const entriesByDay = useMemo(() => new Map(diaryEntries.map((entry) => [entry.day, entry])), [diaryEntries]);
@@ -94,6 +112,7 @@ export default function DiaryPage() {
           return null;
         }
 
+        setUserId(user.id);
         return fetchDiaryArchiveByUserId(user.id, selectedYear, selectedMonth);
       })
       .then((archive) => {
@@ -111,7 +130,32 @@ export default function DiaryPage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, reloadKey]);
+
+  const closeCategoryModal = () => {
+    setIsCategoryModalOpen(false);
+    setNewCategoryName('');
+  };
+
+  const handleCreateCategory = async () => {
+    const title = newCategoryName.trim();
+    if (!title || !userId || isCreatingCategory) {
+      return;
+    }
+
+    setIsCreatingCategory(true);
+
+    try {
+      await createDiaryCategory(userId, title);
+      closeCategoryModal();
+      setReloadKey((key) => key + 1);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '카테고리를 추가하지 못했어요.';
+      Alert.alert('등록 실패', message);
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -175,7 +219,17 @@ export default function DiaryPage() {
         </View>
 
         <View style={styles.categorySection}>
-          <Text style={styles.categoryTitle}>Category</Text>
+          <View style={styles.categoryHeaderRow}>
+            <Text style={styles.categoryTitle}>Category</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="새 카테고리 추가"
+              hitSlop={10}
+              onPress={() => setIsCategoryModalOpen(true)}
+              style={({ pressed }) => [styles.addCategoryButton, pressed && styles.pressed]}>
+              <Ionicons name="add" size={24} color={darkGray} />
+            </Pressable>
+          </View>
           <ScrollView
             horizontal
             contentContainerStyle={styles.categoryList}
@@ -268,6 +322,69 @@ export default function DiaryPage() {
             </View>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      <Modal
+        visible={isCategoryModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={closeCategoryModal}>
+        <View style={styles.sheetOverlay}>
+          <Pressable style={styles.sheetBackdrop} onPress={closeCategoryModal} />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.sheetKeyboardAvoiding}>
+            <View style={styles.sheet}>
+              <View style={styles.sheetHeader}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="닫기"
+                  hitSlop={10}
+                  onPress={closeCategoryModal}
+                  style={styles.sheetBackButton}>
+                  <Ionicons name="arrow-back" size={24} color={darkGray} />
+                </Pressable>
+                <Text style={styles.sheetTitle}>새 카테고리</Text>
+                <View style={styles.sheetHeaderSpacer} />
+              </View>
+              <View style={styles.sheetDivider} />
+
+              <View style={styles.sheetBody}>
+                <TextInput
+                  value={newCategoryName}
+                  onChangeText={setNewCategoryName}
+                  placeholder="카테고리명"
+                  placeholderTextColor={gray}
+                  style={styles.categoryInput}
+                  maxLength={MAX_CATEGORY_NAME_LENGTH}
+                  returnKeyType="done"
+                  autoFocus
+                  onSubmitEditing={() => {
+                    void handleCreateCategory();
+                  }}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="등록하기"
+                  disabled={!newCategoryName.trim() || isCreatingCategory}
+                  onPress={() => {
+                    void handleCreateCategory();
+                  }}
+                  style={({ pressed }) => [
+                    styles.submitButton,
+                    (!newCategoryName.trim() || isCreatingCategory) && styles.submitButtonDisabled,
+                    pressed && styles.pressed,
+                  ]}>
+                  {isCreatingCategory ? (
+                    <ActivityIndicator color={white} />
+                  ) : (
+                    <Text style={styles.submitButtonText}>등록하기</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -380,10 +497,97 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     backgroundColor: background,
   },
+  categoryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 22,
+  },
   categoryTitle: {
-    marginLeft: 22,
     color: darkGray,
     fontFamily: FontFamily.pretendardBold,
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  addCategoryButton: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pressed: {
+    opacity: 0.6,
+  },
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  sheetKeyboardAvoiding: {
+    width: '100%',
+  },
+  sheet: {
+    backgroundColor: white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+  },
+  sheetHeader: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
+  sheetBackButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  sheetTitle: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 18,
+    lineHeight: 24,
+  },
+  sheetHeaderSpacer: {
+    width: 32,
+  },
+  sheetDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E8ECEE',
+  },
+  sheetBody: {
+    paddingHorizontal: 20,
+    paddingTop: 28,
+    gap: 20,
+  },
+  categoryInput: {
+    height: 44,
+    borderRadius: 26,
+    backgroundColor: background,
+    paddingHorizontal: 22,
+    color: darkGray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 15,
+  },
+  submitButton: {
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitButtonText: {
+    color: white,
+    fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 16,
     lineHeight: 20,
   },
