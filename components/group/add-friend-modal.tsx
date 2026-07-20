@@ -14,6 +14,7 @@ import {
 
 import { background, darkGray, FontFamily, gray, lightGray, primary, white } from '@/constants/theme';
 import {
+  cancelFriendRequest,
   fetchRelationStatuses,
   searchUsersByKeyword,
   sendFriendRequest,
@@ -124,6 +125,30 @@ export function AddFriendModal({ visible, currentUserId, onClose }: AddFriendMod
     }
   };
 
+  const handleCancel = async (userId: string) => {
+    if (!currentUserId || pendingIds[userId]) {
+      return;
+    }
+
+    setPendingIds((current) => ({ ...current, [userId]: true }));
+    // 낙관적 업데이트: 버튼을 즉시 '추가' 가능 상태로 되돌린다.
+    setStatuses((current) => ({ ...current, [userId]: 'none' }));
+
+    try {
+      await cancelFriendRequest(currentUserId, userId);
+    } catch (error) {
+      console.warn('[add-friend] Failed to cancel request', error);
+      // 실패 시 원상 복구
+      setStatuses((current) => ({ ...current, [userId]: 'requested' }));
+    } finally {
+      setPendingIds((current) => {
+        const next = { ...current };
+        delete next[userId];
+        return next;
+      });
+    }
+  };
+
   const renderItem = ({ item }: { item: AppUser }) => {
     const status = statuses[item.id] ?? 'none';
 
@@ -138,7 +163,11 @@ export function AddFriendModal({ visible, currentUserId, onClose }: AddFriendMod
             @{item.tag}
           </Text>
         </View>
-        <ActionButton status={status} onAdd={() => handleAdd(item.id)} />
+        <ActionButton
+          status={status}
+          onAdd={() => handleAdd(item.id)}
+          onCancel={() => handleCancel(item.id)}
+        />
       </View>
     );
   };
@@ -200,7 +229,15 @@ export function AddFriendModal({ visible, currentUserId, onClose }: AddFriendMod
   );
 }
 
-function ActionButton({ status, onAdd }: { status: FriendRelationStatus; onAdd: () => void }) {
+function ActionButton({
+  status,
+  onAdd,
+  onCancel,
+}: {
+  status: FriendRelationStatus;
+  onAdd: () => void;
+  onCancel: () => void;
+}) {
   if (status === 'friend') {
     return (
       <View style={[styles.actionButton, styles.friendButton]}>
@@ -210,10 +247,15 @@ function ActionButton({ status, onAdd }: { status: FriendRelationStatus; onAdd: 
   }
 
   if (status === 'requested') {
+    // '요청됨' 상태에서 한 번 더 누르면 보낸 친구 요청을 취소한다.
     return (
-      <View style={[styles.actionButton, styles.requestedButton]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="친구 요청 취소"
+        onPress={onCancel}
+        style={({ pressed }) => [styles.actionButton, styles.requestedButton, pressed && styles.pressed]}>
         <Text style={[styles.actionText, styles.requestedText]}>요청됨</Text>
-      </View>
+      </Pressable>
     );
   }
 

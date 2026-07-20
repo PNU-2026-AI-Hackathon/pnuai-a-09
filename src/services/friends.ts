@@ -180,3 +180,98 @@ export async function sendFriendRequest(
     throw new Error(error.message ?? '친구 요청 중 문제가 발생했습니다.');
   }
 }
+
+/** 내가 보낸 대기중(pending) 친구 요청을 취소(요청 행 삭제)한다. */
+export async function cancelFriendRequest(
+  requesterId: string,
+  addresseeId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('friend_requests')
+    .delete()
+    .eq('requester_id', requesterId)
+    .eq('addressee_id', addresseeId)
+    .eq('status', 'pending');
+
+  if (error) {
+    throw new Error(error.message ?? '친구 요청 취소에 실패했습니다.');
+  }
+}
+
+/** 나에게 온 대기중(pending) 친구 요청을 보낸 사람들의 프로필 목록을 반환한다. */
+export async function fetchIncomingFriendRequests(userId: string): Promise<AppUser[]> {
+  const { data, error } = await supabase
+    .from('friend_requests')
+    .select('requester_id, created_at')
+    .eq('addressee_id', userId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .returns<{ requester_id: string; created_at: string }[]>();
+
+  if (error || !data) {
+    console.warn('[friends] Failed to load incoming requests', {
+      code: error?.code,
+      message: error?.message,
+    });
+    return [];
+  }
+
+  const requesterIds = data.map((row) => row.requester_id);
+
+  if (requesterIds.length === 0) {
+    return [];
+  }
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level')
+    .in('id', requesterIds)
+    .returns<ProfileRow[]>();
+
+  if (profilesError || !profiles) {
+    console.warn('[friends] Failed to load requester profiles', {
+      code: profilesError?.code,
+      message: profilesError?.message,
+    });
+    return [];
+  }
+
+  // 요청 최신순 정렬을 유지한다.
+  const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
+
+  return requesterIds
+    .map((id) => profilesById.get(id))
+    .filter((profile): profile is ProfileRow => Boolean(profile))
+    .map(mapUserRowToAppUser);
+}
+
+/** 친구 요청을 수락(accepted)하거나 거절(요청 행 삭제)한다. */
+export async function respondToFriendRequest(
+  requesterId: string,
+  addresseeId: string,
+  accept: boolean,
+): Promise<void> {
+  if (accept) {
+    const { error } = await supabase
+      .from('friend_requests')
+      .update({ status: 'accepted' })
+      .eq('requester_id', requesterId)
+      .eq('addressee_id', addresseeId);
+
+    if (error) {
+      throw new Error(error.message ?? '친구 요청 수락에 실패했습니다.');
+    }
+
+    return;
+  }
+
+  const { error } = await supabase
+    .from('friend_requests')
+    .delete()
+    .eq('requester_id', requesterId)
+    .eq('addressee_id', addresseeId);
+
+  if (error) {
+    throw new Error(error.message ?? '친구 요청 거절에 실패했습니다.');
+  }
+}

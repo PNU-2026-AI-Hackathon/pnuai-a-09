@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useSegments } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { background, darkGray, FontFamily, primary, white } from '@/constants/theme';
@@ -24,11 +24,8 @@ function Segment({
   );
 }
 
-export function HomeHeader() {
+export function HomeHeader({ active }: { active: 'feed' | 'group' }) {
   const router = useRouter();
-  const segments = useSegments();
-  const leaf = segments[segments.length - 1];
-  const active: 'feed' | 'group' = leaf === 'group' ? 'group' : 'feed';
 
   const go = (tab: 'feed' | 'group') => {
     if (tab === 'feed') {
