@@ -10,6 +10,7 @@ type UserRow = {
   name: string;
   tag: string;
   profile_image_url: string | null;
+  cover_image_url?: string | null;
   description: string | null;
   installed_at: string;
   intimacy_level: number;
@@ -25,6 +26,8 @@ export type AppUser = {
   name: string;
   tag: string;
   profile_image: ImageSourcePropType;
+  /** 커버(배경) 이미지 공개 URL. 없으면 null (연한 회색 표시) */
+  cover_image_url: string | null;
   description: string;
   installed_at: string;
   intimacy_level: number;
@@ -49,12 +52,28 @@ function getProfileImageSource(path: string | null): ImageSourcePropType {
   return { uri: data.publicUrl };
 }
 
+/** 스토리지 경로/URL 을 공개 URL(string) 로 변환한다. 값이 없으면 null. (커버 이미지용) */
+function getPublicCoverUrl(path: string | null | undefined): string | null {
+  if (!path) {
+    return null;
+  }
+
+  if (path.startsWith('http')) {
+    return path.startsWith('http://') ? path.replace('http://', 'https://') : path;
+  }
+
+  const storagePath = path.startsWith('profiles/') ? path.replace('profiles/', '') : path;
+
+  return supabase.storage.from('profiles').getPublicUrl(storagePath).data.publicUrl;
+}
+
 function toAppUser(row: UserRow, stats?: UserStats): AppUser {
   return {
     id: row.id,
     name: row.name,
     tag: row.tag,
     profile_image: getProfileImageSource(row.profile_image_url),
+    cover_image_url: getPublicCoverUrl(row.cover_image_url),
     description: row.description ?? '',
     installed_at: row.installed_at,
     intimacy_level: row.intimacy_level,
@@ -119,7 +138,7 @@ async function fetchUserStats(userId: string): Promise<UserStats | null> {
 export async function fetchUserById(userId: string): Promise<AppUser | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level')
+    .select('id, name, tag, profile_image_url, cover_image_url, description, installed_at, intimacy_level')
     .eq('id', userId)
     .maybeSingle<UserRow>();
 
@@ -184,10 +203,53 @@ export async function uploadProfileImage(userId: string, localUri: string): Prom
   return supabase.storage.from('profiles').getPublicUrl(path).data.publicUrl;
 }
 
+/**
+ * 로컬 파일(file://) 커버 이미지를 'profiles' 버킷의 `{userId}/cover/` 경로에 업로드하고 공개 URL 을 반환한다.
+ * (프로필 이미지와 동일한 버킷/RLS 정책 — 첫 폴더가 본인 userId 이므로 그대로 적용된다.)
+ */
+export async function uploadCoverImage(userId: string, localUri: string): Promise<string> {
+  const bytes = await new File(localUri).bytes();
+
+  const rawExt = localUri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+  const ext = PROFILE_IMAGE_CONTENT_TYPES[rawExt] ? rawExt : 'jpg';
+  const contentType = PROFILE_IMAGE_CONTENT_TYPES[ext];
+  const path = `${userId}/cover/${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage.from('profiles').upload(path, bytes, {
+    contentType,
+    upsert: true,
+  });
+
+  if (error) {
+    throw new Error(error.message ?? '커버 이미지 업로드에 실패했습니다.');
+  }
+
+  return supabase.storage.from('profiles').getPublicUrl(path).data.publicUrl;
+}
+
+/** 커버 이미지를 갤러리에서 골라 업로드 후 내 프로필(profiles.cover_image_url)에 저장하고, 저장된 공개 URL 을 반환한다. */
+export async function saveCoverImage(userId: string, localUri: string): Promise<string> {
+  const coverImageUrl = await uploadCoverImage(userId, localUri);
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      cover_image_url: coverImageUrl,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    throw new Error(error.message ?? '커버 이미지 저장에 실패했습니다.');
+  }
+
+  return coverImageUrl;
+}
+
 export async function fetchUserByTag(tag: string): Promise<AppUser | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level')
+    .select('id, name, tag, profile_image_url, cover_image_url, description, installed_at, intimacy_level')
     .eq('tag', tag)
     .maybeSingle<UserRow>();
 

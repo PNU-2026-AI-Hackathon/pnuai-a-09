@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -27,7 +28,6 @@ import { useFriends } from "@/src/contexts/friends";
 import type { AppUser } from "@/src/services/users";
 const whaleCharacter = require("../../../assets/icons/whale1.png");
 const whaleGradation = require("../../../assets/icons/gradation.png");
-const noop = () => undefined;
 const MEMBER_CARD_WIDTH = 123;
 const MEMBER_CARD_HEIGHT = 104;
 const BOUNCE_PADDING = {
@@ -177,6 +177,7 @@ function FloatingWhale() {
 }
 
 export default function GroupPage() {
+  const router = useRouter();
   const { circleMembers, currentUserId } = useFriends();
   const [selectedFriend, setSelectedFriend] = useState<AppUser | null>(null);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -376,7 +377,22 @@ export default function GroupPage() {
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    onPress={noop}
+                    onPress={() => {
+                      const friend = selectedFriend;
+                      if (!friend) {
+                        return;
+                      }
+                      setSelectedFriend(null);
+                      router.push({
+                        pathname: "/(tabs)/home/friend",
+                        params: {
+                          userId: friend.id,
+                          name: friend.name,
+                          tag: friend.tag,
+                          description: friend.description,
+                        },
+                      });
+                    }}
                     style={styles.visitButton}
                   >
                     <Text style={styles.visitButtonText}>방문하기</Text>

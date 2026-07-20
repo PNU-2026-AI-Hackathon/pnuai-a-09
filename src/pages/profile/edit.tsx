@@ -25,6 +25,7 @@ const emptyProfile: AppUser = {
   name: '',
   tag: '',
   profile_image: require('../../../assets/icons/test.png'),
+  cover_image_url: null,
   description: '',
   installed_at: new Date().toISOString(),
   intimacy_level: 1,
