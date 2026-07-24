@@ -6,6 +6,8 @@ export default function ProfileLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="edit" />
       <Stack.Screen name="notifications" />
+      <Stack.Screen name="friend" />
+      <Stack.Screen name="friend-list" />
     </Stack>
   );
 }

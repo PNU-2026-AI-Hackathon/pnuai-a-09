@@ -55,7 +55,7 @@ function mapOnboardingError(error: { code?: string; message?: string }) {
   return new Error(error.message ?? '요청 처리 중 문제가 발생했습니다.');
 }
 
-async function isProfileFieldTaken(
+export async function isProfileFieldTaken(
   field: 'name' | 'tag',
   value: string,
   excludeUserId: string,
@@ -78,6 +78,12 @@ function createPendingTag(userId: string) {
   return `tmp${userId.replace(/-/g, '').slice(0, 7)}`;
 }
 
+// name 컬럼은 NOT NULL + UNIQUE 이므로, 이름을 아직 받지 못한 소셜 로그인(예: Apple)에서도
+// 유저별로 유일한 임시 이름을 넣어 stub row 를 만들 수 있게 한다. 프로필 단계에서 실제 닉네임으로 교체된다.
+function createPendingName(userId: string) {
+  return `user${userId.replace(/-/g, '').slice(0, 6)}`;
+}
+
 function isPlaceholderTag(tag: string | null | undefined) {
   if (!tag?.trim()) {
     return true;
@@ -94,10 +100,32 @@ async function upsertProfileStub(
     profileImageUrl?: string;
   },
 ): Promise<void> {
-  const profileFields = {
-    email: seed.email?.trim() || null,
-    name: seed.name?.trim() || null,
-    profile_image_url: seed.profileImageUrl?.trim() || null,
+  // 이미 있는 row 를 갱신할 때는 값이 있는 필드만 반영해, 기존 이름/이미지를 null 로 덮어쓰지 않는다.
+  const updateFields: Record<string, string> = {};
+  const email = seed.email?.trim();
+  const name = seed.name?.trim();
+  const profileImageUrl = seed.profileImageUrl?.trim();
+
+  if (email) {
+    updateFields.email = email;
+  }
+  if (name) {
+    updateFields.name = name;
+  }
+  if (profileImageUrl) {
+    updateFields.profile_image_url = profileImageUrl;
+  }
+
+  const updateProfile = async () => {
+    if (Object.keys(updateFields).length === 0) {
+      return;
+    }
+
+    const { error } = await supabase.from('profiles').update(updateFields).eq('id', userId);
+
+    if (error) {
+      throw mapOnboardingError(error);
+    }
   };
 
   const { data: existing, error: existingError } = await supabase
@@ -111,28 +139,21 @@ async function upsertProfileStub(
   }
 
   if (existing) {
-    const { error } = await supabase.from('profiles').update(profileFields).eq('id', userId);
-
-    if (error) {
-      throw mapOnboardingError(error);
-    }
-
+    await updateProfile();
     return;
   }
 
+  // 신규 row 는 NOT NULL 컬럼(name, tag)에 임시값을 채워 넣는다. 프로필 단계에서 실제 값으로 교체된다.
   const { error: insertError } = await supabase.from('profiles').insert({
     id: userId,
-    ...profileFields,
+    email: email || null,
+    name: name || createPendingName(userId),
+    profile_image_url: profileImageUrl || null,
     tag: createPendingTag(userId),
   });
 
   if (insertError?.code === '23505') {
-    const { error: updateError } = await supabase.from('profiles').update(profileFields).eq('id', userId);
-
-    if (updateError) {
-      throw mapOnboardingError(updateError);
-    }
-
+    await updateProfile();
     return;
   }
 
@@ -287,8 +308,11 @@ export async function fetchOnboardingProfileSeed(user: User): Promise<{
       email: string | null;
     }>();
 
+  const profileName = profile?.name?.trim();
+  const realName = profileName && profileName !== createPendingName(user.id) ? profileName : '';
+
   return {
-    nickname: profile?.name?.trim() || metadata.nickname,
+    nickname: realName || metadata.nickname,
     profileImage: resolveProfileImageUrl(profile?.profile_image_url || metadata.profileImage),
     email: profile?.email?.trim() || metadata.email,
   };
@@ -339,6 +363,9 @@ export async function getOnboardingStatus(userId: string): Promise<OnboardingSta
 
   const profile = profileResult.data;
   const terms = termsResult.data;
+  const profileNameValue = profile?.name?.trim();
+  const realProfileName =
+    profileNameValue && profileNameValue !== createPendingName(userId) ? profileNameValue : null;
   const hasProfile = Boolean(profile);
   const hasTermsAgreement = Boolean(terms?.service_terms_agreed && terms?.privacy_policy_agreed);
   const isComplete = Boolean(
@@ -353,7 +380,7 @@ export async function getOnboardingStatus(userId: string): Promise<OnboardingSta
     isComplete,
     hasProfile,
     hasTermsAgreement,
-    profileName: profile?.name?.trim() || null,
+    profileName: realProfileName,
     profileImageUrl: profile?.profile_image_url?.trim() || null,
   };
 }

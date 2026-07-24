@@ -1,5 +1,6 @@
 import { Image } from "expo-image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -10,8 +11,11 @@ import {
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
+import { HomeHeader } from "@/components/home/home-header";
+import { AddFriendModal } from "@/components/group/add-friend-modal";
 import { AnimatedWaveBackground } from "@/components/group/animated-wave-background";
 import { WaterDropDecoration } from "@/components/group/water-drop-decoration";
 import {
@@ -26,7 +30,8 @@ import { useFriends } from "@/src/contexts/friends";
 import type { AppUser } from "@/src/services/users";
 const whaleCharacter = require("../../../assets/icons/whale1.png");
 const whaleGradation = require("../../../assets/icons/gradation.png");
-const noop = () => undefined;
+const fullWhaleImage = require("../../../assets/icons/full_whale.png");
+const MAX_FRIENDS = 20;
 const MEMBER_CARD_WIDTH = 123;
 const MEMBER_CARD_HEIGHT = 104;
 const BOUNCE_PADDING = {
@@ -94,7 +99,7 @@ function createInitialMotion(
 
 function PlusIcon() {
   return (
-    <Svg width={12} height={12} viewBox="0 0 12 12" fill="none">
+    <Svg width={18} height={18} viewBox="0 0 12 12" fill="none">
       <Path
         d="M5.75 0.75L5.75 10.75M10.75 5.75L0.75 5.75"
         stroke={primary}
@@ -176,8 +181,18 @@ function FloatingWhale() {
 }
 
 export default function GroupPage() {
-  const { circleMembers } = useFriends();
+  const router = useRouter();
+  const { friends, circleMembers, currentUserId, reload } = useFriends();
+
+  // 친구 화면에 들어올 때마다 최신 친구 목록을 다시 불러온다 (수락/추가 직후 반영).
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
   const [selectedFriend, setSelectedFriend] = useState<AppUser | null>(null);
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isCapacityOpen, setIsCapacityOpen] = useState(false);
   const [playArea, setPlayArea] = useState<PlayArea>({ width: 0, height: 0 });
   const [whaleMotions, setWhaleMotions] = useState<Record<string, WhaleMotion>>(
     {},
@@ -296,8 +311,10 @@ export default function GroupPage() {
   }, [playArea, whaleMotions]);
 
   return (
-    <View style={styles.screen} onLayout={handleScreenLayout}>
-      <AnimatedWaveBackground style={styles.backgroundImage} />
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <HomeHeader active="group" />
+      <View style={styles.screen} onLayout={handleScreenLayout}>
+        <AnimatedWaveBackground style={styles.backgroundImage} />
       {playArea.width > 0 && playArea.height > 0 ? (
         <View style={styles.waterDropLayer} pointerEvents="none">
           <WaterDropDecoration width={playArea.width} height={playArea.height} />
@@ -374,7 +391,22 @@ export default function GroupPage() {
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    onPress={noop}
+                    onPress={() => {
+                      const friend = selectedFriend;
+                      if (!friend) {
+                        return;
+                      }
+                      setSelectedFriend(null);
+                      router.push({
+                        pathname: "/(tabs)/home/friend",
+                        params: {
+                          userId: friend.id,
+                          name: friend.name,
+                          tag: friend.tag,
+                          description: friend.description,
+                        },
+                      });
+                    }}
                     style={styles.visitButton}
                   >
                     <Text style={styles.visitButtonText}>방문하기</Text>
@@ -391,26 +423,6 @@ export default function GroupPage() {
                   <Text style={styles.profileDescription} numberOfLines={3}>
                     {selectedFriend.description}
                   </Text>
-                  <View style={styles.statRow}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>
-                        {selectedFriend.friends_count}
-                      </Text>
-                      <Text style={styles.statLabel}>Friends</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>
-                        {selectedFriend.like_count}
-                      </Text>
-                      <Text style={styles.statLabel}>Like</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>
-                        {selectedFriend.post_count}
-                      </Text>
-                      <Text style={styles.statLabel}>Post</Text>
-                    </View>
-                  </View>
                 </View>
               </View>
             ) : null}
@@ -420,7 +432,13 @@ export default function GroupPage() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="친구초대"
-        onPress={noop}
+        onPress={() => {
+          if (friends.length >= MAX_FRIENDS) {
+            setIsCapacityOpen(true);
+          } else {
+            setIsInviteOpen(true);
+          }
+        }}
         style={({ pressed }) => [
           styles.inviteButton,
           pressed && styles.inviteButtonPressed,
@@ -430,11 +448,53 @@ export default function GroupPage() {
           <PlusIcon />
         </View>
       </Pressable>
-    </View>
+      <AddFriendModal
+        visible={isInviteOpen}
+        currentUserId={currentUserId}
+        onClose={() => setIsInviteOpen(false)}
+      />
+      <Modal
+        visible={isCapacityOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsCapacityOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.capacityCard}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+              onPress={() => setIsCapacityOpen(false)}
+              hitSlop={8}
+              style={styles.closeButton}
+            >
+              <CloseIcon />
+            </Pressable>
+            <View style={styles.capacityWhaleWrap}>
+              <Image
+                source={fullWhaleImage}
+                style={styles.capacityWhale}
+                contentFit="contain"
+              />
+              <Text style={styles.capacityHint}>꽉낀다..</Text>
+            </View>
+            <Text style={styles.capacityTitle}>친구 목록이 꽉 찼어요!</Text>
+            <Text style={styles.capacitySubtitle}>
+              최대 {MAX_FRIENDS}명까지 추가할 수 있어요.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: background,
+  },
   screen: {
     flex: 1,
     overflow: "hidden",
@@ -523,8 +583,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   inviteIcon: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 30,
     backgroundColor: white,
     alignItems: "center",
@@ -556,6 +616,50 @@ const styles = StyleSheet.create({
     height: 24,
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 1,
+  },
+  capacityCard: {
+    width: "100%",
+    maxWidth: 340,
+    borderRadius: 16,
+    backgroundColor: white,
+    paddingTop: 22,
+    paddingBottom: 30,
+    paddingHorizontal: 24,
+    alignItems: "center",
+  },
+  capacityWhaleWrap: {
+    marginTop: 6,
+    width: "100%",
+    height: 140,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  capacityWhale: {
+    width: 160,
+    height: 118,
+  },
+  capacityHint: {
+    position: "absolute",
+    right: 48,
+    top: 42,
+    color: gray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  capacityTitle: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 18,
+    lineHeight: 26,
+  },
+  capacitySubtitle: {
+    marginTop: 2,
+    color: darkGray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 14,
+    lineHeight: 20,
   },
   profileContent: {
     flexDirection: "row",
@@ -564,7 +668,7 @@ const styles = StyleSheet.create({
   profileLeft: {
     width: 116,
     alignItems: "center",
-    paddingTop: 12,
+    paddingTop: 10,
   },
   profileImageFrame: {
     marginTop: 20,
@@ -594,49 +698,26 @@ const styles = StyleSheet.create({
   },
   profileRight: {
     flex: 1,
-    paddingTop: 18,
+    paddingTop: 40,
   },
   profileName: {
     color: "#000000",
     fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 18,
+    lineHeight: 20,
   },
   profileTag: {
     marginTop: 2,
     color: gray,
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 14,
+    lineHeight: 18,
   },
   profileDescription: {
     marginTop: 10,
     color: darkGray,
     fontFamily: FontFamily.pretendardRegular,
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 18,
-  },
-  statRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 18,
-    paddingRight: 6,
-  },
-  statItem: {
-    minWidth: 42,
-    alignItems: "center",
-  },
-  statValue: {
-    color: "#3C4446",
-    fontFamily: FontFamily.pretendardSemiBold,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  statLabel: {
-    marginTop: 6,
-    color: "#9EA2A3",
-    fontFamily: FontFamily.pretendardRegular,
-    fontSize: 10,
-    lineHeight: 12,
   },
 });

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useFriends } from '@/src/contexts/friends';
 import { fetchFeedPostsByUserIds } from '@/src/services/posts';
@@ -9,6 +9,7 @@ import type { FeedPost } from '@/src/types/api/feed-post';
 
 import { FeedPostCard } from '@/src/pages/feed/post-card';
 
+import { HomeHeader } from '@/components/home/home-header';
 import { PencilIcon } from '@/components/icons/pencil-icon';
 import { background, primary } from '@/constants/theme';
 
@@ -61,26 +62,33 @@ export default function FeedPage() {
   const bottomPad = fabBottom + FAB_SIZE + 16;
 
   return (
-    <View style={styles.screen}>
-      <FlatList
-        data={feedPosts}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad }]}
-        showsVerticalScrollIndicator={false}
-      />
-      <Pressable
-        style={[styles.fab, { bottom: fabBottom }]}
-        accessibilityRole="button"
-        accessibilityLabel="글 작성"
-        onPress={() => router.push('/(tabs)/write')}>
-        <PencilIcon size={22} />
-      </Pressable>
-    </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <HomeHeader active="feed" />
+      <View style={styles.screen}>
+        <FlatList
+          data={feedPosts}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad }]}
+          showsVerticalScrollIndicator={false}
+        />
+        <Pressable
+          style={[styles.fab, { bottom: fabBottom }]}
+          accessibilityRole="button"
+          accessibilityLabel="글 작성"
+          onPress={() => router.push('/(tabs)/write')}>
+          <PencilIcon size={22} />
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: background,
+  },
   screen: {
     flex: 1,
     backgroundColor: background,

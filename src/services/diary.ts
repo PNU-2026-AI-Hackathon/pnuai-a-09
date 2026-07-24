@@ -128,6 +128,21 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
     });
   });
 
+  // 사용자가 직접 만든(글이 아직 없는) 카테고리도 함께 표시한다.
+  const savedTitles = await fetchDiaryCategories(userId);
+  savedTitles.forEach((rawTitle) => {
+    const title = rawTitle.trim();
+    if (!title || categoriesByName.has(title)) {
+      return;
+    }
+
+    categoriesByName.set(title, {
+      id: title.toLowerCase().replace(/\s+/g, '-'),
+      title,
+      postCount: 0,
+    });
+  });
+
   return {
     entries,
     categories: [
@@ -140,6 +155,46 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
       ...categoriesByName.values(),
     ],
   };
+}
+
+/**
+ * 사용자가 직접 만든 다이어리 카테고리 제목 목록. (diary_categories 테이블)
+ * 테이블이 없거나 RLS 로 막히면 빈 배열을 반환해 다이어리 로딩을 깨지 않는다.
+ */
+export async function fetchDiaryCategories(userId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('diary_categories')
+    .select('title')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .returns<{ title: string }[]>();
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data.map((row) => row.title);
+}
+
+/** 새 다이어리 카테고리를 생성한다. (제목만) */
+export async function createDiaryCategory(userId: string, title: string): Promise<void> {
+  const trimmed = title.trim();
+
+  if (!trimmed) {
+    throw new Error('카테고리명을 입력해 주세요.');
+  }
+
+  const { error } = await supabase.from('diary_categories').insert({
+    user_id: userId,
+    title: trimmed,
+  });
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('이미 있는 카테고리예요.');
+    }
+    throw new Error(error.message ?? '카테고리 추가에 실패했습니다.');
+  }
 }
 
 export async function fetchDiaryArchiveByUserTag(tag: string, year: number, month: number): Promise<DiaryArchive> {
