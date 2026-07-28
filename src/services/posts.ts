@@ -1,4 +1,5 @@
 import { File } from 'expo-file-system';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
 import { supabase } from '@/src/lib/supabase';
 import type { FeedComment, FeedPost, PostVisibility } from '@/src/types/api/feed-post';
@@ -561,6 +562,51 @@ export async function fetchFeedPostsByUserIds(userIds: string[]): Promise<FeedPo
   return mapPostsFromRows(data);
 }
 
+/**
+ * 업로드 전 리사이즈 기준(긴 변). 피드는 화면 폭, 상세는 정사각형 한 장이 최대라
+ * 1600px 이면 고해상도 기기에서도 충분하다.
+ */
+const MAX_UPLOAD_DIMENSION = 1600;
+const UPLOAD_JPEG_QUALITY = 0.8;
+
+/**
+ * 업로드용으로 이미지를 줄이고 JPEG 로 바꾼다.
+ *
+ * 사진첩 원본은 5MB 를 넘는 경우가 흔한데, 그대로 올리면 업로드가 느리고 스토리지·
+ * 트래픽을 크게 먹는다. 긴 변이 기준보다 작으면 리사이즈 없이 JPEG 변환만 한다.
+ *
+ * 변환에 실패하면 원본 경로를 그대로 돌려준다 — 사진이 조금 큰 것보다 글이 안 올라가는 게 나쁘다.
+ */
+async function compressForUpload(localUri: string): Promise<{ uri: string; contentType: string; ext: string }> {
+  try {
+    const context = ImageManipulator.manipulate(localUri);
+    const rendered = await context.renderAsync();
+
+    const longestSide = Math.max(rendered.width, rendered.height);
+    if (longestSide > MAX_UPLOAD_DIMENSION) {
+      const scale = MAX_UPLOAD_DIMENSION / longestSide;
+      context.resize({
+        width: Math.round(rendered.width * scale),
+        height: Math.round(rendered.height * scale),
+      });
+    }
+
+    const result = await (await context.renderAsync()).saveAsync({
+      format: SaveFormat.JPEG,
+      compress: UPLOAD_JPEG_QUALITY,
+    });
+
+    return { uri: result.uri, contentType: 'image/jpeg', ext: 'jpg' };
+  } catch (error) {
+    console.warn('[posts] Failed to compress image, uploading original', error);
+
+    const rawExt = localUri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+    const ext = POST_IMAGE_CONTENT_TYPES[rawExt] ? rawExt : 'jpg';
+
+    return { uri: localUri, contentType: POST_IMAGE_CONTENT_TYPES[ext], ext };
+  }
+}
+
 const POST_IMAGE_CONTENT_TYPES: Record<string, string> = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
@@ -586,14 +632,12 @@ async function uploadPostImage(userId: string, localUri: string, index: number):
     throw new Error('사진을 읽지 못했습니다. 다시 선택해 주세요.');
   }
 
-  const bytes = await new File(localUri).bytes();
-
-  const rawExt = localUri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
-  const ext = POST_IMAGE_CONTENT_TYPES[rawExt] ? rawExt : 'jpg';
+  const { uri, contentType, ext } = await compressForUpload(localUri);
+  const bytes = await new File(uri).bytes();
   const path = `${userId}/${Date.now()}-${index}.${ext}`;
 
   const { error } = await supabase.storage.from('posts').upload(path, bytes, {
-    contentType: POST_IMAGE_CONTENT_TYPES[ext],
+    contentType,
     upsert: true,
   });
 

@@ -273,7 +273,9 @@ export default function DiaryPage() {
                         onError={() => setFailedCategoryImages((prev) => ({ ...prev, [category.id]: true }))}
                       />
                     ) : (
-                      <View style={[styles.folderImage, styles.categoryImageFallback]} />
+                      // 대표 사진이 없으면(글이 없거나 사진 없는 글만 있는 경우)
+                      // 회색 사각형 대신 아무것도 그리지 않아 빈 폴더처럼 보이게 한다.
+                      null
                     )}
                     <View style={styles.folderOverlay}>
                       <FolderIcon />
@@ -635,9 +637,6 @@ const styles = StyleSheet.create({
     width: 55,
     height: 52,
     borderRadius: 5,
-  },
-  categoryImageFallback: {
-    backgroundColor: '#B1B1B1',
   },
   folderOverlay: {
     position: 'absolute',
