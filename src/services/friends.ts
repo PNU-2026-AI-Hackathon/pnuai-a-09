@@ -1,4 +1,5 @@
 import { supabase } from '@/src/lib/supabase';
+import { fetchBlockedUserIds } from '@/src/services/blocks';
 import type { AppUser } from '@/src/services/users';
 import { mapUserRowToAppUser } from '@/src/services/users';
 
@@ -108,7 +109,11 @@ export async function searchUsersByKeyword(
     return [];
   }
 
-  return data.map(mapUserRowToAppUser);
+  // 나를 차단한 사람은 RLS 가 이미 걸러 준다. 내가 차단한 사람은 (차단 해제를 위해)
+  // 프로필이 계속 보이므로 검색 결과에서는 직접 제외한다.
+  const blockedIds = await fetchBlockedUserIds();
+
+  return data.filter((row) => !blockedIds.has(row.id)).map(mapUserRowToAppUser);
 }
 
 type FriendRequestStatusRow = {

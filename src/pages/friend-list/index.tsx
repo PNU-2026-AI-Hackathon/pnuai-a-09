@@ -15,8 +15,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ConfirmModal } from '@/components/confirm-modal';
 import { background, darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
 import { supabase } from '@/src/lib/supabase';
+import { blockUser } from '@/src/services/blocks';
+import { createReport } from '@/src/services/reports';
 import {
   cancelFriendRequest,
   fetchRelationStatuses,
@@ -27,6 +30,7 @@ import {
 import type { AppUser } from '@/src/services/users';
 
 type RowMenu = { userId: string; top: number; right: number };
+type ConfirmTarget = { userId: string; action: 'block' | 'report' };
 
 export default function FriendListPage() {
   const params = useLocalSearchParams<{
@@ -44,7 +48,12 @@ export default function FriendListPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [pendingIds, setPendingIds] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<RowMenu | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
+  const [isConfirmPending, setIsConfirmPending] = useState(false);
   const menuButtonRefs = useRef<Record<string, View | null>>({});
+
+  const confirmTargetName =
+    friends.find((friend) => friend.id === confirmTarget?.userId)?.name ?? '이 사용자';
 
   const initialCount = params.count ? Number(params.count) : null;
   const count = isLoading && initialCount != null ? initialCount : friends.length;
@@ -189,20 +198,45 @@ export default function FriendListPage() {
 
   const handleBlock = (userId: string) => {
     setMenu(null);
-    const target = friends.find((friend) => friend.id === userId);
-    Alert.alert('차단', `${target?.name ?? '이 사용자'}님을 차단할까요?`, [
-      { text: '취소', style: 'cancel' },
-      { text: '차단', style: 'destructive', onPress: () => undefined },
-    ]);
+    setConfirmTarget({ userId, action: 'block' });
   };
 
   const handleReport = (userId: string) => {
     setMenu(null);
-    const target = friends.find((friend) => friend.id === userId);
-    Alert.alert('신고', `${target?.name ?? '이 사용자'}님을 신고할까요?`, [
-      { text: '취소', style: 'cancel' },
-      { text: '신고', style: 'destructive', onPress: () => undefined },
-    ]);
+    setConfirmTarget({ userId, action: 'report' });
+  };
+
+  const confirmBlock = async (userId: string) => {
+    setIsConfirmPending(true);
+    try {
+      await blockUser(userId);
+      setConfirmTarget(null);
+      // 내 친구 목록을 보고 있을 때만 즉시 제거한다. 남의 친구 목록에서는
+      // 차단해도 그 사람의 친구인 건 그대로이므로 목록을 건드리지 않는다.
+      if (params.userId === currentUserId) {
+        setFriends((prev) => prev.filter((friend) => friend.id !== userId));
+      }
+    } catch (error) {
+      setConfirmTarget(null);
+      Alert.alert(error instanceof Error ? error.message : '차단하지 못했습니다.');
+    } finally {
+      setIsConfirmPending(false);
+    }
+  };
+
+  const confirmReport = async (userId: string) => {
+    setIsConfirmPending(true);
+    try {
+      // 신고 사유 선택은 디자인 확정 후 추가한다. 지금은 사유 없이 접수만 한다.
+      await createReport({ targetType: 'user', targetId: userId });
+      setConfirmTarget(null);
+      Alert.alert('신고가 접수되었어요.');
+    } catch (error) {
+      setConfirmTarget(null);
+      Alert.alert(error instanceof Error ? error.message : '신고를 접수하지 못했습니다.');
+    } finally {
+      setIsConfirmPending(false);
+    }
   };
 
   const renderItem: ListRenderItem<AppUser> = ({ item }) => {
@@ -317,6 +351,28 @@ export default function FriendListPage() {
           </View>
         </>
       ) : null}
+
+      <ConfirmModal
+        visible={confirmTarget?.action === 'block'}
+        title={`${confirmTargetName}님을 차단할까요?`}
+        message="친구 관계가 해제되고 서로의 게시글이 보이지 않게 돼요. 설정에서 다시 해제할 수 있어요."
+        confirmLabel="차단"
+        destructive
+        isPending={isConfirmPending}
+        onConfirm={() => confirmTarget && confirmBlock(confirmTarget.userId)}
+        onCancel={() => setConfirmTarget(null)}
+      />
+
+      <ConfirmModal
+        visible={confirmTarget?.action === 'report'}
+        title={`${confirmTargetName}님을 신고할까요?`}
+        message="신고 내용은 운영팀이 확인해요."
+        confirmLabel="신고"
+        destructive
+        isPending={isConfirmPending}
+        onConfirm={() => confirmTarget && confirmReport(confirmTarget.userId)}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </View>
   );
 }

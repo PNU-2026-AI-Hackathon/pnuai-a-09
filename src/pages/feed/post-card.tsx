@@ -22,9 +22,11 @@ import {
 import type { FeedComment, FeedPost } from '@/src/types/api/feed-post';
 
 import { ConfirmModal } from '@/components/confirm-modal';
+import { useCurrentUserId } from '@/hooks/use-current-user-id';
 import { darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
-import { useFriends } from '@/src/contexts/friends';
+import { blockUser } from '@/src/services/blocks';
 import { createComment, deletePost, toggleCommentLike, togglePostLike } from '@/src/services/posts';
+import { createReport } from '@/src/services/reports';
 
 type Props = {
   post: FeedPost;
@@ -231,13 +233,17 @@ function CommentItem({
 
 export function FeedPostCard({ post, onDeleted }: Props) {
   const router = useRouter();
-  const { currentUserId } = useFriends();
+  // FriendsProvider 는 home 탭에만 있어서, 보관함·프로필 탭에서도 쓰이는 이 카드는
+  // 컨텍스트 대신 프로바이더에 의존하지 않는 훅을 쓴다.
+  const currentUserId = useCurrentUserId();
   const isOwner = currentUserId != null && currentUserId === post.user_id;
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
   const [isReportConfirmOpen, setIsReportConfirmOpen] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
   // 목록을 들고 있는 화면이 여러 곳이라, 삭제되면 카드가 스스로 사라진다.
   const [isDeleted, setIsDeleted] = useState(false);
 
@@ -465,6 +471,46 @@ export function FeedPostCard({ post, onDeleted }: Props) {
       Alert.alert(error instanceof Error ? error.message : '게시글 삭제에 실패했습니다.');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleBlock = async () => {
+    if (isBlocking) {
+      return;
+    }
+
+    setIsBlocking(true);
+    try {
+      await blockUser(post.user_id);
+      setIsBlockConfirmOpen(false);
+      // 차단하면 이 사람 글은 더 이상 보이면 안 되므로 카드를 즉시 걷어낸다.
+      setIsDeleted(true);
+      onDeleted?.(post.id);
+      // 친구 목록은 화면에 다시 들어올 때 갱신된다. 차단당한 사람의 글은 RLS 가
+      // 이미 가리므로, 목록이 잠깐 낡아도 내용이 새는 일은 없다.
+    } catch (error) {
+      setIsBlockConfirmOpen(false);
+      Alert.alert(error instanceof Error ? error.message : '차단하지 못했습니다.');
+    } finally {
+      setIsBlocking(false);
+    }
+  };
+
+  const handleReport = async () => {
+    if (isReporting) {
+      return;
+    }
+
+    setIsReporting(true);
+    try {
+      await createReport({ targetType: 'post', targetId: post.id });
+      setIsReportConfirmOpen(false);
+      Alert.alert('신고가 접수되었어요.');
+    } catch (error) {
+      setIsReportConfirmOpen(false);
+      Alert.alert(error instanceof Error ? error.message : '신고를 접수하지 못했습니다.');
+    } finally {
+      setIsReporting(false);
     }
   };
 
@@ -720,31 +766,26 @@ export function FeedPostCard({ post, onDeleted }: Props) {
         onCancel={() => setIsDeleteConfirmOpen(false)}
       />
 
-      {/* TODO: 차단·신고를 저장할 테이블이 아직 없다. 서버가 준비되면
-          onConfirm 에서 실제 API 를 호출하도록 바꾼다. (friend-list 화면도 같은 상태) */}
       <ConfirmModal
         visible={isBlockConfirmOpen}
         title={`${post.username}님을 차단할까요?`}
-        message="차단하면 서로의 게시글과 댓글이 보이지 않게 돼요."
+        message="친구 관계가 해제되고 서로의 게시글이 보이지 않게 돼요. 설정에서 다시 해제할 수 있어요."
         confirmLabel="차단"
         destructive
-        onConfirm={() => {
-          setIsBlockConfirmOpen(false);
-          Alert.alert('차단 기능은 준비 중이에요.');
-        }}
+        isPending={isBlocking}
+        onConfirm={handleBlock}
         onCancel={() => setIsBlockConfirmOpen(false)}
       />
 
+      {/* 신고 사유 선택은 디자인 확정 후 추가한다. 지금은 사유 없이 접수만 한다. */}
       <ConfirmModal
         visible={isReportConfirmOpen}
         title="이 게시글을 신고할까요?"
         message="신고 내용은 운영팀이 확인해요."
         confirmLabel="신고"
         destructive
-        onConfirm={() => {
-          setIsReportConfirmOpen(false);
-          Alert.alert('신고 기능은 준비 중이에요.');
-        }}
+        isPending={isReporting}
+        onConfirm={handleReport}
         onCancel={() => setIsReportConfirmOpen(false)}
       />
     </View>

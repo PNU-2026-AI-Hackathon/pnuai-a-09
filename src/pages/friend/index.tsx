@@ -258,31 +258,24 @@ export default function FriendProfilePage() {
         </Pressable>
       </View>
 
+      {/* 드롭다운은 여기서 그리지 않는다 — 리스트 헤더 안에 두면 목록에 가리거나
+          안드로이드에서 잘려 안 보인다. 화면 최상단에 따로 띄운다(아래 참고). */}
       <View style={styles.sortRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="정렬 변경"
-          onPress={() => setIsSortMenuOpen((open) => !open)}
-          style={styles.sortButton}>
-          <Text style={styles.sortLabel}>{SORT_LABELS[sortOrder]}</Text>
-          <Ionicons name="chevron-down" size={16} color={'#777777'} />
-        </Pressable>
-        {isSortMenuOpen ? (
-          <View style={styles.sortMenu}>
-            {(Object.keys(SORT_LABELS) as PostSortOrder[]).map((option) => (
-              <Pressable
-                key={option}
-                accessibilityRole="button"
-                onPress={() => handleSelectSort(option)}
-                style={styles.sortMenuItem}>
-                <Text
-                  style={[styles.sortMenuText, sortOrder === option && styles.sortMenuTextSelected]}>
-                  {SORT_LABELS[option]}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+        <View ref={sortButtonRef} collapsable={false}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="정렬 변경"
+            onPress={toggleSortMenu}
+            style={styles.sortButton}>
+            <Text style={styles.sortLabel}>{SORT_LABELS[sortOrder]}</Text>
+            <Ionicons
+              name="chevron-down"
+              size={16}
+              color={'#777777'}
+              style={isSortMenuOpen ? styles.chevronOpen : undefined}
+            />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
