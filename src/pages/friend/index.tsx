@@ -2,10 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams, useSegments } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
   ListRenderItem,
   Pressable,
@@ -52,6 +53,10 @@ export default function FriendProfilePage() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [sortOrder, setSortOrder] = useState<PostSortOrder>('latest');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const [sortMenuPosition, setSortMenuPosition] = useState<{ top: number; right: number } | null>(
+    null,
+  );
+  const sortButtonRef = useRef<View | null>(null);
   // 방금 고른 커버(로컬 미리보기). 저장 성공 시 user.cover_image_url 로 대체된다.
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isSavingCover, setIsSavingCover] = useState(false);
@@ -188,6 +193,20 @@ export default function FriendProfilePage() {
     setIsSortMenuOpen(false);
   };
 
+  // 버튼 위치를 재서 화면 좌표에 드롭다운을 띄운다.
+  const toggleSortMenu = () => {
+    if (isSortMenuOpen) {
+      setIsSortMenuOpen(false);
+      return;
+    }
+
+    sortButtonRef.current?.measureInWindow((x, y, width, height) => {
+      const screenWidth = Dimensions.get('window').width;
+      setSortMenuPosition({ top: y + height + 6, right: screenWidth - (x + width) });
+      setIsSortMenuOpen(true);
+    });
+  };
+
   const renderItem: ListRenderItem<FeedPost> = ({ item }) => <FeedPostCard post={item} />;
 
   const listHeader = (
@@ -302,6 +321,32 @@ export default function FriendProfilePage() {
         scrollEnabled={!isSortMenuOpen}
         showsVerticalScrollIndicator={false}
       />
+
+      {isSortMenuOpen && sortMenuPosition ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="정렬 메뉴 닫기"
+            style={styles.sortMenuBackdrop}
+            onPress={() => setIsSortMenuOpen(false)}
+          />
+          <View
+            style={[styles.sortMenu, { top: sortMenuPosition.top, right: sortMenuPosition.right }]}>
+            {(Object.keys(SORT_LABELS) as PostSortOrder[]).map((option) => (
+              <Pressable
+                key={option}
+                accessibilityRole="button"
+                onPress={() => handleSelectSort(option)}
+                style={({ pressed }) => [styles.sortMenuItem, pressed && styles.pressed]}>
+                <Text
+                  style={[styles.sortMenuText, sortOrder === option && styles.sortMenuTextSelected]}>
+                  {SORT_LABELS[option]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
 
       <View style={[styles.topBar, { top: insets.top + 4 }]} pointerEvents="box-none">
         <Pressable
@@ -442,10 +487,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 16,
   },
+  sortMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+  },
+  chevronOpen: {
+    transform: [{ rotate: '180deg' }],
+  },
   sortMenu: {
     position: 'absolute',
-    top: 34,
-    right: 20,
     minWidth: 96,
     backgroundColor: white,
     borderRadius: 4,
@@ -455,7 +505,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 8,
-    zIndex: 20,
+    zIndex: 30,
   },
   sortMenuItem: {
     paddingHorizontal: 4,

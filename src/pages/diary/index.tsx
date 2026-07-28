@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -86,6 +86,9 @@ export default function DiaryPage() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [failedDiaryImages, setFailedDiaryImages] = useState<Record<number, boolean>>({});
+  // 사진이 실제로 그려졌는지. 그려지기 전까지는 날짜 글씨가 흰 배경에 흰색으로 겹쳐
+  // 보이지 않으므로, 로드 완료 전에는 셀에 배경색을 깔아 둔다.
+  const [loadedDiaryImages, setLoadedDiaryImages] = useState<Record<number, boolean>>({});
   const [failedCategoryImages, setFailedCategoryImages] = useState<Record<string, boolean>>({});
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [diaryCategories, setDiaryCategories] = useState<DiaryCategory[]>([]);
@@ -104,6 +107,7 @@ export default function DiaryPage() {
     setDiaryEntries([]);
     setDiaryCategories([]);
     setFailedDiaryImages({});
+    setLoadedDiaryImages({});
     setFailedCategoryImages({});
 
     fetchCurrentUser()
@@ -189,6 +193,8 @@ export default function DiaryPage() {
                 const entry = day ? entriesByDay.get(day) : undefined;
                 const hasFailedDiaryImage = day ? failedDiaryImages[day] : false;
                 const photoSource = entry?.hasPhoto && entry.image && !hasFailedDiaryImage ? entry.image : undefined;
+                // 사진 칸인데 아직 안 그려졌으면(로딩·실패) 배경을 깔아 날짜가 보이게 한다.
+                const needsPhotoBackdrop = Boolean(entry?.hasPhoto) && !(day && loadedDiaryImages[day]);
 
                 return (
                   <View key={`${day ?? 'empty'}-${weekIndex}-${dayIndex}`} style={styles.dayCell}>
@@ -197,14 +203,17 @@ export default function DiaryPage() {
                         style={[
                           styles.dayContent,
                           entry && !entry.hasPhoto ? styles.textDiaryCell : undefined,
-                          entry?.hasPhoto && !photoSource ? styles.photoFallbackCell : undefined,
+                          needsPhotoBackdrop ? styles.photoFallbackCell : undefined,
                         ]}>
                         {photoSource ? (
                           <Image
                             source={photoSource}
                             style={styles.dayImage}
                             blurRadius={8}
-                            resizeMode="cover"
+                            contentFit="cover"
+                            cachePolicy="memory-disk"
+                            transition={120}
+                            onLoad={() => setLoadedDiaryImages((prev) => ({ ...prev, [day]: true }))}
                             onError={() => setFailedDiaryImages((prev) => ({ ...prev, [day]: true }))}
                           />
                         ) : null}
@@ -258,7 +267,9 @@ export default function DiaryPage() {
                       <Image
                         source={category.image}
                         style={styles.folderImage}
-                        resizeMode="cover"
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={120}
                         onError={() => setFailedCategoryImages((prev) => ({ ...prev, [category.id]: true }))}
                       />
                     ) : (
@@ -490,6 +501,10 @@ const styles = StyleSheet.create({
   },
   activeDayText: {
     color: white,
+    // 밝은 사진 위에서도 날짜가 묻히지 않게 한다.
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   categorySection: {
     marginTop: 30,
