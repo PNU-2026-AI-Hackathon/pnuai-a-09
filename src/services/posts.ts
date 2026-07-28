@@ -1,5 +1,5 @@
 import { supabase } from '@/src/lib/supabase';
-import type { FeedComment, FeedPost } from '@/src/types/api/feed-post';
+import type { FeedComment, FeedPost, PostVisibility } from '@/src/types/api/feed-post';
 
 type ProfileRow = {
   id: string;
@@ -34,6 +34,7 @@ type PostRow = {
   id: string;
   user_id: string;
   contents: string;
+  visibility: PostVisibility;
   created_at: string;
   profiles: ProfileRow | null;
   post_images: PostImageRow[];
@@ -209,6 +210,7 @@ function mapPost(row: PostRow, likedPostIds: Set<string>, likeStatsByCommentId: 
   return {
     id: row.id,
     user_id: row.user_id,
+    visibility: row.visibility,
     profile_image_url: getPublicStorageUrl('profiles', row.profiles?.profile_image_url ?? null),
     username: row.profiles?.name ?? '알 수 없음',
     created_at: formatDate(row.created_at),
@@ -230,6 +232,7 @@ const POST_DETAIL_SELECT = `
   id,
   user_id,
   contents,
+  visibility,
   created_at,
   profiles!posts_user_id_fkey (
     id,

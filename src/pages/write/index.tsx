@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -29,12 +30,7 @@ import {
   primary,
   white,
 } from '@/constants/theme';
-
-const SAMPLE_RESPONSES = [
-  '마음이 많이 힘들었나봐. 하지만 지난 주에 많이 과로 하지 않았어? 가끔은 쉬어가는 것도 필요하다구~',
-  '오늘 정말 수고했어! 매일 이렇게 노력하는 모습이 너무 대단해. 앞으로도 이렇게만 해줘~',
-  '너는 정말 대단한 사람이야. 오늘도 열심히 살아줘서 고마워!',
-];
+import { createDraftId, fetchWhaleMessage, saveWhaleMemory } from '@/src/services/ai';
 
 export default function WritePage() {
 
@@ -43,24 +39,73 @@ export default function WritePage() {
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isPickerVisible, setIsPickerVisible] = useState(false);
-  const [responseIndex, setResponseIndex] = useState(0);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const inputRef = useRef<TextInput>(null);
 
-  const currentResponse = SAMPLE_RESPONSES[responseIndex];
+  // AI 버튼을 누른 시점의 원문과 초안 id 를 고정해 둔다. 시트 안에서 글을 고쳐도
+  // 재생성·저장에는 항상 이 원문을 쓴다. (고친 글은 이미 긍정적으로 재구성돼 있어
+  // 나중에 비슷한 감정을 찾을 때 원래 감정과 멀어진다)
+  const draftRef = useRef<{ original: string; draftId: string } | null>(null);
+  const [whaleMessage, setWhaleMessage] = useState('');
+  const [isWhaleLoading, setIsWhaleLoading] = useState(false);
+  const [whaleError, setWhaleError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const requestWhaleMessage = async (nextRetryCount: number) => {
+    const draft = draftRef.current;
+    if (!draft) {
+      return;
+    }
+
+    setIsWhaleLoading(true);
+    setWhaleError(null);
+    try {
+      const whale = await fetchWhaleMessage({
+        diary: draft.original,
+        draftId: draft.draftId,
+        retryCount: nextRetryCount,
+      });
+      setWhaleMessage(whale);
+    } catch (error) {
+      setWhaleError(error instanceof Error ? error.message : '한마디를 받아오지 못했어요.');
+    } finally {
+      setIsWhaleLoading(false);
+    }
+  };
 
   const handleAIPress = () => {
     Keyboard.dismiss();
+
+    if (!text.trim()) {
+      Alert.alert('일기를 먼저 작성해 주세요.');
+      return;
+    }
+
+    draftRef.current = { original: text, draftId: createDraftId() };
+    setWhaleMessage('');
+    setRetryCount(0);
     setIsSheetVisible(true);
+    void requestWhaleMessage(0);
   };
 
   const handleRefresh = () => {
-    setResponseIndex((prev) => (prev + 1) % SAMPLE_RESPONSES.length);
+    const next = retryCount + 1;
+    setRetryCount(next);
+    void requestWhaleMessage(next);
   };
 
   const handleApply = (appliedText: string) => {
     setText(appliedText);
     setIsSheetVisible(false);
+
+    // 저장은 "적용하기" 시점에 한 번만. 실패해도 글쓰기를 막지 않는다 —
+    // 장기기억은 다음 한마디의 품질을 위한 부가 기능이다.
+    const draft = draftRef.current;
+    if (draft) {
+      saveWhaleMemory({ originalText: draft.original, draftId: draft.draftId }).catch((error) => {
+        console.warn('[ai] 장기기억 저장 실패', error);
+      });
+    }
   };
 
   const handlePickerConfirm = (uris: string[]) => {
@@ -181,7 +226,9 @@ export default function WritePage() {
       <AIBottomSheet
         visible={isSheetVisible}
         content={text}
-        aiResponse={currentResponse}
+        aiResponse={whaleMessage}
+        isLoading={isWhaleLoading}
+        errorMessage={whaleError}
         onClose={() => setIsSheetVisible(false)}
         onRefresh={handleRefresh}
         onApply={handleApply}
