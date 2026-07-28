@@ -113,15 +113,24 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
   const entries = [...entriesByDay.values()];
   const categoriesByName = new Map<string, DiaryCategory>();
 
+  // 카테고리를 고르지 않은 글의 대표 이미지. '전체'가 쓸 수 있게 따로 챙겨 둔다.
+  let uncategorizedImage: DiaryCategory['image'];
+
   posts.forEach((post) => {
-    const title = post.category?.trim() || '미분류';
-    const categoryId = title.toLowerCase().replace(/\s+/g, '-');
+    const title = post.category?.trim();
     const sortedImages = [...post.post_images].sort((a, b) => a.sort_order - b.sort_order);
     const image = getPostImageSource(sortedImages[0]?.image_url ?? null);
+
+    // 카테고리가 없는 글은 '미분류'로 따로 묶지 않고 '전체'에만 포함한다.
+    if (!title) {
+      uncategorizedImage = uncategorizedImage ?? image;
+      return;
+    }
+
     const current = categoriesByName.get(title);
 
     categoriesByName.set(title, {
-      id: current?.id ?? categoryId,
+      id: current?.id ?? title.toLowerCase().replace(/\s+/g, '-'),
       title,
       postCount: (current?.postCount ?? 0) + 1,
       image: current?.image ?? image,
@@ -150,7 +159,9 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
         id: 'all',
         title: '전체',
         postCount: posts.length,
-        image: [...categoriesByName.values()].find((category) => category.image)?.image,
+        image:
+          [...categoriesByName.values()].find((category) => category.image)?.image ??
+          uncategorizedImage,
       },
       ...categoriesByName.values(),
     ],

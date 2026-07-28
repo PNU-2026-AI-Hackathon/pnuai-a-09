@@ -316,26 +316,41 @@ export async function fetchUserPostCategories(userId: string) {
     }
   >();
 
+  let uncategorizedImage: string | undefined;
+
   data.forEach((post) => {
-    const title = post.category?.trim() || '미분류';
-    const categoryId = title === '미분류' ? 'uncategorized' : title.toLowerCase().replace(/\s+/g, '-');
+    const title = post.category?.trim();
     const sortedImages = [...post.post_images].sort((a, b) => a.sort_order - b.sort_order);
     const imageUrl = getPublicStorageUrl('posts', sortedImages[0]?.image_url ?? null) ?? undefined;
+
+    // 카테고리를 고르지 않은 글은 별도 '미분류'로 묶지 않고 '전체'에만 넣는다.
+    // '전체'는 이미 모든 글을 포함하므로 따로 셀 필요 없이 대표 이미지만 챙긴다.
+    if (!title) {
+      uncategorizedImage = uncategorizedImage ?? imageUrl;
+      return;
+    }
+
     const current = categoriesByTitle.get(title);
 
     categoriesByTitle.set(title, {
-      id: current?.id ?? categoryId,
+      id: current?.id ?? title.toLowerCase().replace(/\s+/g, '-'),
       title,
       postCount: (current?.postCount ?? 0) + 1,
       image: current?.image ?? imageUrl,
     });
   });
 
+  const firstImage = data
+    .flatMap((post) => [...post.post_images].sort((a, b) => a.sort_order - b.sort_order))
+    .map((image) => getPublicStorageUrl('posts', image.image_url) ?? undefined)
+    .find(Boolean);
+
   return [
     {
       id: 'all',
       title: '전체',
       postCount: data.length,
+      image: firstImage ?? uncategorizedImage,
     },
     ...categoriesByTitle.values(),
   ];
@@ -349,12 +364,9 @@ export async function fetchUserPostsByCategory(
 ): Promise<FeedPost[]> {
   let query = supabase.from('posts').select(POST_DETAIL_SELECT).eq('user_id', userId);
 
+  // '전체'(all)는 카테고리를 고르지 않은 글까지 모두 포함한다.
   if (categoryId !== 'all') {
-    if (categoryTitle === '미분류') {
-      query = query.is('category', null);
-    } else {
-      query = query.eq('category', categoryTitle);
-    }
+    query = query.eq('category', categoryTitle);
   }
 
   const { data, error } = await query
@@ -665,4 +677,146 @@ export async function createPost({
   }
 
   return post.id;
+}
+
+/** 수정 화면에서 쓰는 게시글 원본 */
+export type EditablePost = {
+  id: string;
+  contents: string;
+  category: string | null;
+  visibility: PostVisibility;
+  /** 이미 업로드된 이미지. path 는 스토리지 경로, url 은 표시용 공개 URL */
+  images: { path: string; url: string }[];
+};
+
+export async function fetchPostForEdit(postId: string): Promise<EditablePost> {
+  const { data, error } = await supabase
+    .from('posts')
+    .select('id, contents, category, visibility, post_images (image_url, sort_order)')
+    .eq('id', postId)
+    .single<{
+      id: string;
+      contents: string;
+      category: string | null;
+      visibility: PostVisibility;
+      post_images: PostImageRow[];
+    }>();
+
+  if (error || !data) {
+    console.warn('[posts] Failed to load post for edit', error);
+    throw new Error('게시글을 불러오지 못했습니다.');
+  }
+
+  return {
+    id: data.id,
+    contents: data.contents,
+    category: data.category,
+    visibility: data.visibility,
+    images: [...data.post_images]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((image) => ({
+        path: image.image_url,
+        url: getPublicStorageUrl('posts', image.image_url) ?? '',
+      }))
+      .filter((image) => Boolean(image.url)),
+  };
+}
+
+/**
+ * 수정 화면이 넘기는 이미지 한 장.
+ * - path 가 있으면 이미 올라간 이미지 → 그대로 재사용한다.
+ * - path 가 없으면 새로 고른 로컬 이미지 → 업로드한다.
+ */
+export type PostImageInput = { uri: string; path?: string };
+
+export type UpdatePostParams = {
+  postId: string;
+  contents: string;
+  category: string | null;
+  visibility: PostVisibility;
+  images?: PostImageInput[];
+};
+
+/**
+ * 게시글을 수정한다. 이미지는 순서·구성이 바뀔 수 있으므로 post_images 를 지우고 다시 넣는다.
+ * (기존 이미지는 재업로드하지 않고 경로만 재사용한다)
+ */
+export async function updatePost({
+  postId,
+  contents,
+  category,
+  visibility,
+  images = [],
+}: UpdatePostParams): Promise<void> {
+  const trimmedContents = contents.trim();
+  if (!trimmedContents) {
+    throw new Error('내용을 입력해 주세요.');
+  }
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    throw new Error('로그인이 필요합니다.');
+  }
+
+  const paths = await Promise.all(
+    images.map((image, index) => image.path ?? uploadPostImage(user.id, image.uri, index)),
+  );
+
+  const { error } = await supabase
+    .from('posts')
+    .update({ contents: trimmedContents, category, visibility, updated_at: new Date().toISOString() })
+    .eq('id', postId);
+
+  if (error) {
+    console.warn('[posts] Failed to update post', error);
+    throw new Error('게시글 수정에 실패했습니다.');
+  }
+
+  const { error: clearError } = await supabase.from('post_images').delete().eq('post_id', postId);
+
+  if (clearError) {
+    console.warn('[posts] Failed to clear post images', clearError);
+    throw new Error('사진을 수정하지 못했습니다.');
+  }
+
+  if (paths.length > 0) {
+    const { error: imageError } = await supabase.from('post_images').insert(
+      paths.map((path, index) => ({ post_id: postId, image_url: path, sort_order: index })),
+    );
+
+    if (imageError) {
+      console.warn('[posts] Failed to attach images', imageError);
+      throw new Error('사진을 수정하지 못했습니다.');
+    }
+  }
+}
+
+/**
+ * 게시글을 삭제한다. 스토리지 파일은 게시글이 지워진 뒤 정리하며,
+ * 실패해도 삭제 자체는 성공으로 둔다(고아 파일은 사용자에게 보이지 않는다).
+ */
+export async function deletePost(postId: string): Promise<void> {
+  const { data: images } = await supabase
+    .from('post_images')
+    .select('image_url')
+    .eq('post_id', postId);
+
+  const { error } = await supabase.from('posts').delete().eq('id', postId);
+
+  if (error) {
+    console.warn('[posts] Failed to delete post', error);
+    throw new Error('게시글 삭제에 실패했습니다.');
+  }
+
+  const paths = (images ?? []).map((image) => image.image_url).filter(Boolean);
+  if (paths.length > 0) {
+    const { error: storageError } = await supabase.storage.from('posts').remove(paths);
+    if (storageError) {
+      console.warn('[posts] Failed to remove post images from storage', storageError);
+    }
+  }
 }

@@ -32,9 +32,21 @@ type Props = {
   onSubmit: (category: string, visibility: Visibility) => void;
   /** 등록 처리 중 — 버튼을 잠가 중복 등록을 막는다 */
   isSubmitting?: boolean;
+  /** 수정 화면에서 기존 값을 채워 넣을 때 사용 */
+  initialCategory?: string | null;
+  initialVisibility?: Visibility;
+  submitLabel?: string;
 };
 
-export function PostSettingsBottomSheet({ visible, onClose, onSubmit, isSubmitting = false }: Props) {
+export function PostSettingsBottomSheet({
+  visible,
+  onClose,
+  onSubmit,
+  isSubmitting = false,
+  initialCategory = null,
+  initialVisibility = 'public',
+  submitLabel = '등록하기',
+}: Props) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(600)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -70,6 +82,10 @@ export function PostSettingsBottomSheet({ visible, onClose, onSubmit, isSubmitti
 
   useEffect(() => {
     if (visible) {
+      // 열릴 때마다 기존 값으로 맞춘다. 수정 화면에서 저장된 설정이 보여야 한다.
+      // (카테고리 없음 = '전체')
+      setSelectedCategory(initialCategory?.trim() || '전체');
+      setVisibility(initialVisibility);
       setIsModalVisible(true);
       Animated.parallel([
         Animated.spring(slideAnim, {
@@ -187,7 +203,7 @@ export function PostSettingsBottomSheet({ visible, onClose, onSubmit, isSubmitti
             {isSubmitting ? (
               <ActivityIndicator size="small" color={white} />
             ) : (
-              <Text style={styles.submitText}>등록하기</Text>
+              <Text style={styles.submitText}>{submitLabel}</Text>
             )}
           </Pressable>
         </Animated.View>
