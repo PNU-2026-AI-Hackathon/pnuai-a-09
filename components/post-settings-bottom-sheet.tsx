@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Modal,
   Pressable,
@@ -29,9 +30,11 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onSubmit: (category: string, visibility: Visibility) => void;
+  /** 등록 처리 중 — 버튼을 잠가 중복 등록을 막는다 */
+  isSubmitting?: boolean;
 };
 
-export function PostSettingsBottomSheet({ visible, onClose, onSubmit }: Props) {
+export function PostSettingsBottomSheet({ visible, onClose, onSubmit, isSubmitting = false }: Props) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(600)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -175,9 +178,17 @@ export function PostSettingsBottomSheet({ visible, onClose, onSubmit }: Props) {
 
           {/* 등록하기 버튼 */}
           <Pressable
-            style={({ pressed }) => [styles.submitButton, pressed && styles.submitButtonPressed]}
+            style={({ pressed }) => [
+              styles.submitButton,
+              (pressed || isSubmitting) && styles.submitButtonPressed,
+            ]}
+            disabled={isSubmitting}
             onPress={() => onSubmit(selectedCategory, visibility)}>
-            <Text style={styles.submitText}>등록하기</Text>
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color={white} />
+            ) : (
+              <Text style={styles.submitText}>등록하기</Text>
+            )}
           </Pressable>
         </Animated.View>
       </View>

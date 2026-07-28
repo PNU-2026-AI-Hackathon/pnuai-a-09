@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   Alert,
@@ -31,15 +32,22 @@ import {
   white,
 } from '@/constants/theme';
 import { createDraftId, fetchWhaleMessage, saveWhaleMemory } from '@/src/services/ai';
+import { createPost } from '@/src/services/posts';
+import type { PostVisibility } from '@/src/types/api/feed-post';
 
 export default function WritePage() {
+  const router = useRouter();
 
   const [text, setText] = useState('');
   const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isPickerVisible, setIsPickerVisible] = useState(false);
+  // 업로드·표시에 쓰는 file:// URI. iOS 의 ph:// 는 파일로 읽을 수 없어 업로드가 실패한다.
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  // 피커에 다시 넘겨 재선택을 복원하기 위한 원본 에셋 URI (변환 전 값)
+  const [selectedSourceUris, setSelectedSourceUris] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
   // AI 버튼을 누른 시점의 원문과 초안 id 를 고정해 둔다. 시트 안에서 글을 고쳐도
@@ -94,6 +102,36 @@ export default function WritePage() {
     void requestWhaleMessage(next);
   };
 
+  const handleSubmitPost = async (category: string, visibility: PostVisibility) => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createPost({
+        contents: text,
+        // 시트의 "전체"는 특정 카테고리가 아니라 기본값이다. 조회 화면에서 '전체'는
+        // 모든 글을 모아 보는 가상 카테고리라, 그대로 저장하면 같은 이름의 실제
+        // 카테고리가 하나 더 생겨 버린다. null 로 넣어 '미분류'가 되게 한다.
+        category: category === '전체' ? null : category,
+        visibility,
+        imageUris: selectedImages,
+      });
+
+      setIsSettingsVisible(false);
+      setText('');
+      setSelectedImages([]);
+      setSelectedSourceUris([]);
+      draftRef.current = null;
+      router.replace('/(tabs)/home');
+    } catch (error) {
+      Alert.alert(error instanceof Error ? error.message : '게시글 등록에 실패했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleApply = (appliedText: string) => {
     setText(appliedText);
     setIsSheetVisible(false);
@@ -108,8 +146,9 @@ export default function WritePage() {
     }
   };
 
-  const handlePickerConfirm = (uris: string[]) => {
+  const handlePickerConfirm = (uris: string[], sourceUris: string[]) => {
     setSelectedImages(uris.slice(0, 6));
+    setSelectedSourceUris(sourceUris.slice(0, 6));
     setIsPickerVisible(false);
   };
 
@@ -137,6 +176,7 @@ export default function WritePage() {
 
   const removeImage = (index: number) => {
     setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+    setSelectedSourceUris((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -152,6 +192,12 @@ export default function WritePage() {
               variant="dark"
               onPress={() => {
                 Keyboard.dismiss();
+
+                if (!text.trim()) {
+                  Alert.alert('내용을 입력해 주세요.');
+                  return;
+                }
+
                 setIsSettingsVisible(true);
               }}
             />
@@ -210,17 +256,16 @@ export default function WritePage() {
           onConfirm={handlePickerConfirm}
           onClose={() => setIsPickerVisible(false)}
           maxSelect={6}
-          initialSelectedUris={selectedImages}
+          initialSelectedUris={selectedSourceUris}
+          resolveLocalUri
         />
       </Modal>
 
       <PostSettingsBottomSheet
         visible={isSettingsVisible}
+        isSubmitting={isSubmitting}
         onClose={() => setIsSettingsVisible(false)}
-        onSubmit={(_category, _visibility) => {
-          setIsSettingsVisible(false);
-          // TODO: 실제 등록 API 연결
-        }}
+        onSubmit={handleSubmitPost}
       />
 
       <AIBottomSheet

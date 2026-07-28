@@ -1,3 +1,5 @@
+import { File } from 'expo-file-system';
+
 import { supabase } from '@/src/lib/supabase';
 import type { FeedComment, FeedPost, PostVisibility } from '@/src/types/api/feed-post';
 
@@ -545,4 +547,122 @@ export async function fetchFeedPostsByUserIds(userIds: string[]): Promise<FeedPo
   }
 
   return mapPostsFromRows(data);
+}
+
+const POST_IMAGE_CONTENT_TYPES: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+};
+
+/**
+ * 로컬 파일(file://) 이미지를 'posts' 버킷에 올리고 저장 경로를 반환한다.
+ * 공개 URL 이 아니라 경로를 반환하는 이유: post_images.image_url 에는 경로가 들어가고,
+ * 읽을 때 getPublicStorageUrl 이 URL 로 바꾼다.
+ *
+ * React Native 에서는 Blob/File/FormData 업로드가 정상 동작하지 않아 바이트로 올린다.
+ * (CustomImagePicker 가 ph:// 를 file:// 로 변환해 넘겨준다)
+ */
+async function uploadPostImage(userId: string, localUri: string, index: number): Promise<string> {
+  // iOS 라이브러리 에셋(ph://)은 파일로 읽을 수 없다. 여기까지 넘어왔다면 피커에서
+  // resolveLocalUri 로 변환하지 않은 것이므로, 네이티브에서 터지기 전에 잡아 준다.
+  // (그 외 스킴은 막지 않는다 — 기기별로 다를 수 있어 네이티브 판단에 맡긴다)
+  if (!localUri || localUri.startsWith('ph://') || localUri.startsWith('assets-library://')) {
+    throw new Error('사진을 읽지 못했습니다. 다시 선택해 주세요.');
+  }
+
+  const bytes = await new File(localUri).bytes();
+
+  const rawExt = localUri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+  const ext = POST_IMAGE_CONTENT_TYPES[rawExt] ? rawExt : 'jpg';
+  const path = `${userId}/${Date.now()}-${index}.${ext}`;
+
+  const { error } = await supabase.storage.from('posts').upload(path, bytes, {
+    contentType: POST_IMAGE_CONTENT_TYPES[ext],
+    upsert: true,
+  });
+
+  if (error) {
+    throw new Error(error.message ?? '이미지 업로드에 실패했습니다.');
+  }
+
+  return path;
+}
+
+export type CreatePostParams = {
+  contents: string;
+  /** 카테고리 제목. 지정하지 않으면 null(미분류)로 저장한다 */
+  category: string | null;
+  visibility: PostVisibility;
+  /** 로컬 이미지 URI 목록. 배열 순서가 그대로 sort_order 가 된다 */
+  imageUris?: string[];
+};
+
+/**
+ * 게시글을 등록한다. 이미지가 있으면 먼저 업로드한 뒤 posts → post_images 순으로 넣는다.
+ *
+ * 업로드를 먼저 하는 이유: 이미지 업로드가 실패하면 게시글이 아예 생기지 않아
+ * 사용자가 그대로 다시 시도할 수 있다. post_images 삽입이 실패하는 경우에만
+ * 이미 만든 posts 행을 되돌린다(이미지 없는 게시글이 남지 않게).
+ */
+export async function createPost({
+  contents,
+  category,
+  visibility,
+  imageUris = [],
+}: CreatePostParams): Promise<string> {
+  const trimmedContents = contents.trim();
+  if (!trimmedContents) {
+    throw new Error('내용을 입력해 주세요.');
+  }
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    throw new Error('로그인이 필요합니다.');
+  }
+
+  const imagePaths = await Promise.all(
+    imageUris.map((uri, index) => uploadPostImage(user.id, uri, index)),
+  );
+
+  const { data: post, error } = await supabase
+    .from('posts')
+    .insert({
+      user_id: user.id,
+      contents: trimmedContents,
+      category,
+      visibility,
+    })
+    .select('id')
+    .single();
+
+  if (error || !post) {
+    console.warn('[posts] Failed to create post', error);
+    throw new Error('게시글 등록에 실패했습니다.');
+  }
+
+  if (imagePaths.length > 0) {
+    const { error: imageError } = await supabase.from('post_images').insert(
+      imagePaths.map((path, index) => ({
+        post_id: post.id,
+        image_url: path,
+        sort_order: index,
+      })),
+    );
+
+    if (imageError) {
+      await supabase.from('posts').delete().eq('id', post.id);
+      console.warn('[posts] Failed to attach images', imageError);
+      throw new Error('사진을 등록하지 못했습니다. 다시 시도해 주세요.');
+    }
+  }
+
+  return post.id;
 }

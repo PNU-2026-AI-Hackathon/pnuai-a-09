@@ -1,5 +1,5 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,6 +23,15 @@ export default function FeedPage() {
   const insets = useSafeAreaInsets();
   const { feedUserIds, isLoading } = useFriends();
   const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
+  // 탭 화면은 한 번 뜨면 계속 마운트된 상태로 남는다. 글을 쓰고 돌아왔을 때 방금
+  // 올린 글이 보이도록, 화면에 다시 포커스될 때마다 목록을 새로 받아온다.
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      setRefreshKey((key) => key + 1);
+    }, []),
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -36,8 +45,8 @@ export default function FeedPage() {
       return;
     }
 
-    setFeedPosts([]);
-
+    // 여기서 목록을 비우지 않는다 — 포커스마다 다시 받아오므로, 비우면 탭을 옮길
+    // 때마다 화면이 한 번씩 깜빡인다. 받아온 결과로 통째로 교체한다.
     fetchFeedPostsByUserIds(feedUserIds)
       .then((posts) => {
         if (isMounted) {
@@ -54,7 +63,7 @@ export default function FeedPage() {
     return () => {
       isMounted = false;
     };
-  }, [feedUserIds, isLoading]);
+  }, [feedUserIds, isLoading, refreshKey]);
 
   const renderItem: ListRenderItem<FeedPost> = ({ item }) => <FeedPostCard post={item} />;
 

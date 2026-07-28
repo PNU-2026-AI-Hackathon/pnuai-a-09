@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Image,
+  Keyboard,
   Modal,
   Pressable,
   StyleSheet,
@@ -99,6 +100,9 @@ export function AIBottomSheet({
             styles.sheet,
             { paddingBottom: insets.bottom + 20, transform: [{ translateY: slideAnim }] },
           ]}>
+          {/* 시트 안쪽 빈 곳을 누르면 키보드를 내린다. accessible={false} 는 이 래퍼가
+              스크린리더에서 하나의 버튼처럼 읽히지 않게 하려는 것이다. */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={Keyboard.dismiss} accessible={false} />
 
           {/* Header: 뒤로가기 + "고래에게 물어보기" */}
           <View style={styles.header}>
