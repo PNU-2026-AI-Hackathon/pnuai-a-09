@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Image,
+  Keyboard,
   Modal,
   Pressable,
   StyleSheet,
@@ -29,9 +31,22 @@ type Props = {
   onClose: () => void;
   onRefresh: () => void;
   onApply: (text: string) => void;
+  /** 한마디를 받아오는 중 */
+  isLoading?: boolean;
+  /** 실패했을 때 말풍선에 대신 띄울 문구 */
+  errorMessage?: string | null;
 };
 
-export function AIBottomSheet({ visible, content, aiResponse, onClose, onRefresh, onApply }: Props) {
+export function AIBottomSheet({
+  visible,
+  content,
+  aiResponse,
+  onClose,
+  onRefresh,
+  onApply,
+  isLoading = false,
+  errorMessage = null,
+}: Props) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(700)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -85,6 +100,9 @@ export function AIBottomSheet({ visible, content, aiResponse, onClose, onRefresh
             styles.sheet,
             { paddingBottom: insets.bottom + 20, transform: [{ translateY: slideAnim }] },
           ]}>
+          {/* 시트 안쪽 빈 곳을 누르면 키보드를 내린다. accessible={false} 는 이 래퍼가
+              스크린리더에서 하나의 버튼처럼 읽히지 않게 하려는 것이다. */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={Keyboard.dismiss} accessible={false} />
 
           {/* Header: 뒤로가기 + "고래에게 물어보기" */}
           <View style={styles.header}>
@@ -108,12 +126,25 @@ export function AIBottomSheet({ visible, content, aiResponse, onClose, onRefresh
               <View style={styles.bubbleWrapper}>
                 <View style={styles.bubbleTail} />
                 <View style={styles.speechBubble}>
-                  <Text style={styles.responseText}>{aiResponse}</Text>
+                  {isLoading ? (
+                    <View style={styles.loadingRow}>
+                      <ActivityIndicator size="small" color={primary} />
+                      <Text style={styles.responseText}>고래가 생각하는 중이에요...</Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.responseText, errorMessage && styles.errorText]}>
+                      {errorMessage ?? aiResponse}
+                    </Text>
+                  )}
                 </View>
               </View>
-              <Pressable style={styles.refreshButton} onPress={onRefresh} hitSlop={8}>
+              <Pressable
+                style={({ pressed }) => [styles.refreshButton, (isLoading || pressed) && styles.dimmed]}
+                onPress={onRefresh}
+                disabled={isLoading}
+                hitSlop={8}>
                 <RefreshIcon />
-                <Text style={styles.refreshText}>다른 한마디</Text>
+                <Text style={styles.refreshText}>{errorMessage ? '다시 시도' : '다른 한마디'}</Text>
               </Pressable>
             </View>
           </View>
@@ -253,6 +284,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: darkGray,
     lineHeight: 18,
+  },
+  errorText: {
+    color: gray,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dimmed: {
+    opacity: 0.4,
   },
   refreshButton: {
     flexDirection: 'row',

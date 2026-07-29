@@ -1,5 +1,8 @@
-import { useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -29,42 +32,199 @@ import {
   primary,
   white,
 } from '@/constants/theme';
+import { createDraftId, fetchWhaleMessage, saveWhaleMemory } from '@/src/services/ai';
+import { createPost, fetchPostForEdit, updatePost, type EditablePost } from '@/src/services/posts';
+import type { PostVisibility } from '@/src/types/api/feed-post';
 
-const SAMPLE_RESPONSES = [
-  '마음이 많이 힘들었나봐. 하지만 지난 주에 많이 과로 하지 않았어? 가끔은 쉬어가는 것도 필요하다구~',
-  '오늘 정말 수고했어! 매일 이렇게 노력하는 모습이 너무 대단해. 앞으로도 이렇게만 해줘~',
-  '너는 정말 대단한 사람이야. 오늘도 열심히 살아줘서 고마워!',
-];
+/**
+ * 화면에서 다루는 이미지 한 장.
+ * - uri:       표시·업로드에 쓰는 값. 새 이미지는 file://, 기존 이미지는 공개 URL.
+ * - sourceUri: 피커에 되돌려 재선택을 복원하기 위한 원본 에셋 URI.
+ * - path:      이미 업로드된 이미지의 스토리지 경로. 있으면 다시 올리지 않는다.
+ */
+type DraftImage = { uri: string; sourceUri: string; path?: string };
 
 export default function WritePage() {
+  const router = useRouter();
 
   const [text, setText] = useState('');
   const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
   const [isSheetVisible, setIsSheetVisible] = useState(false);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isPickerVisible, setIsPickerVisible] = useState(false);
-  const [responseIndex, setResponseIndex] = useState(0);
-  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [images, setImages] = useState<DraftImage[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<TextInput>(null);
 
-  const currentResponse = SAMPLE_RESPONSES[responseIndex];
+  // 수정 모드 — 피드에서 "수정"을 눌러 들어오면 postId 가 넘어온다.
+  const { postId } = useLocalSearchParams<{ postId?: string }>();
+  const [editingPost, setEditingPost] = useState<EditablePost | null>(null);
+  const [isLoadingPost, setIsLoadingPost] = useState(false);
+  const isEditing = editingPost != null;
+
+  // AI 버튼을 누른 시점의 원문과 초안 id 를 고정해 둔다. 시트 안에서 글을 고쳐도
+  // 재생성·저장에는 항상 이 원문을 쓴다. (고친 글은 이미 긍정적으로 재구성돼 있어
+  // 나중에 비슷한 감정을 찾을 때 원래 감정과 멀어진다)
+  const draftRef = useRef<{ original: string; draftId: string } | null>(null);
+  const [whaleMessage, setWhaleMessage] = useState('');
+  const [isWhaleLoading, setIsWhaleLoading] = useState(false);
+  const [whaleError, setWhaleError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const resetForm = useCallback(() => {
+    setText('');
+    setImages([]);
+    setEditingPost(null);
+    draftRef.current = null;
+    setWhaleMessage('');
+    setWhaleError(null);
+    setRetryCount(0);
+  }, []);
+
+  // 수정 진입 시 원본을 불러와 화면을 채운다.
+  useEffect(() => {
+    if (!postId) {
+      // 등록을 마치고 파라미터를 지웠거나, 탭으로 새로 들어온 경우.
+      setEditingPost(null);
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoadingPost(true);
+
+    fetchPostForEdit(postId)
+      .then((post) => {
+        if (!isMounted) {
+          return;
+        }
+        setEditingPost(post);
+        setText(post.contents);
+        setImages(
+          post.images.map((image) => ({ uri: image.url, sourceUri: image.url, path: image.path })),
+        );
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+        Alert.alert(error instanceof Error ? error.message : '게시글을 불러오지 못했습니다.');
+        router.back();
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingPost(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [postId, router]);
+
+  const requestWhaleMessage = async (nextRetryCount: number) => {
+    const draft = draftRef.current;
+    if (!draft) {
+      return;
+    }
+
+    setIsWhaleLoading(true);
+    setWhaleError(null);
+    try {
+      const whale = await fetchWhaleMessage({
+        diary: draft.original,
+        draftId: draft.draftId,
+        retryCount: nextRetryCount,
+      });
+      setWhaleMessage(whale);
+    } catch (error) {
+      setWhaleError(error instanceof Error ? error.message : '한마디를 받아오지 못했어요.');
+    } finally {
+      setIsWhaleLoading(false);
+    }
+  };
 
   const handleAIPress = () => {
     Keyboard.dismiss();
+
+    if (!text.trim()) {
+      Alert.alert('일기를 먼저 작성해 주세요.');
+      return;
+    }
+
+    draftRef.current = { original: text, draftId: createDraftId() };
+    setWhaleMessage('');
+    setRetryCount(0);
     setIsSheetVisible(true);
+    void requestWhaleMessage(0);
   };
 
   const handleRefresh = () => {
-    setResponseIndex((prev) => (prev + 1) % SAMPLE_RESPONSES.length);
+    const next = retryCount + 1;
+    setRetryCount(next);
+    void requestWhaleMessage(next);
+  };
+
+  const handleSubmitPost = async (category: string, visibility: PostVisibility) => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // 시트의 "전체"는 특정 카테고리가 아니라 기본값이다. 보관함에서 '전체'는 모든 글을
+      // 모아 보는 자리라, 그대로 저장하면 같은 이름의 실제 카테고리가 하나 더 생긴다.
+      // null 로 넣으면 분류 없는 글로 '전체'에만 들어간다.
+      const categoryValue = category === '전체' ? null : category;
+
+      if (editingPost) {
+        await updatePost({
+          postId: editingPost.id,
+          contents: text,
+          category: categoryValue,
+          visibility,
+          images: images.map((image) => ({ uri: image.uri, path: image.path })),
+        });
+      } else {
+        await createPost({
+          contents: text,
+          category: categoryValue,
+          visibility,
+          imageUris: images.map((image) => image.uri),
+        });
+      }
+
+      setIsSettingsVisible(false);
+      resetForm();
+      // 수정 모드로 다시 들어오지 않도록 파라미터를 지운다 (탭은 계속 살아 있다).
+      router.replace('/(tabs)/home');
+    } catch (error) {
+      const fallback = editingPost ? '게시글 수정에 실패했습니다.' : '게시글 등록에 실패했습니다.';
+      Alert.alert(error instanceof Error ? error.message : fallback);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleApply = (appliedText: string) => {
     setText(appliedText);
     setIsSheetVisible(false);
+
+    // 저장은 "적용하기" 시점에 한 번만. 실패해도 글쓰기를 막지 않는다 —
+    // 장기기억은 다음 한마디의 품질을 위한 부가 기능이다.
+    const draft = draftRef.current;
+    if (draft) {
+      saveWhaleMemory({ originalText: draft.original, draftId: draft.draftId }).catch((error) => {
+        console.warn('[ai] 장기기억 저장 실패', error);
+      });
+    }
   };
 
-  const handlePickerConfirm = (uris: string[]) => {
-    setSelectedImages(uris.slice(0, 6));
+  const handlePickerConfirm = (uris: string[], sourceUris: string[]) => {
+    const picked = uris.map((uri, index) => ({ uri, sourceUri: sourceUris[index] ?? uri }));
+
+    // 수정 화면의 기존 이미지(path 가 있는 것)는 피커 목록에 없으므로 그대로 두고,
+    // 피커에서 고른 것만 교체한다. 기존 이미지를 빼려면 그리드의 X 로 지우면 된다.
+    setImages((prev) => [...prev.filter((image) => image.path), ...picked].slice(0, 6));
     setIsPickerVisible(false);
   };
 
@@ -91,7 +251,7 @@ export default function WritePage() {
   };
 
   const removeImage = (index: number) => {
-    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -103,10 +263,16 @@ export default function WritePage() {
           {/* Topbar */}
           <View style={styles.topBar}>
             <ThemedButton
-              label="등록"
+              label={isEditing ? '수정' : '등록'}
               variant="dark"
               onPress={() => {
                 Keyboard.dismiss();
+
+                if (!text.trim()) {
+                  Alert.alert('내용을 입력해 주세요.');
+                  return;
+                }
+
                 setIsSettingsVisible(true);
               }}
             />
@@ -116,9 +282,14 @@ export default function WritePage() {
 
           {/* 사진 그리드 + 텍스트 입력 영역 */}
           <View style={styles.contentArea}>
-            {selectedImages.length > 0 && (
+            {isLoadingPost && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="small" color={primary} />
+              </View>
+            )}
+            {images.length > 0 && (
               <View style={styles.gridWrapper}>
-                <ImageGrid uris={selectedImages} onRemove={removeImage} />
+                <ImageGrid uris={images.map((image) => image.uri)} onRemove={removeImage} />
               </View>
             )}
             <TextInput
@@ -165,23 +336,27 @@ export default function WritePage() {
           onConfirm={handlePickerConfirm}
           onClose={() => setIsPickerVisible(false)}
           maxSelect={6}
-          initialSelectedUris={selectedImages}
+          initialSelectedUris={images.map((image) => image.sourceUri)}
+          resolveLocalUri
         />
       </Modal>
 
       <PostSettingsBottomSheet
         visible={isSettingsVisible}
+        isSubmitting={isSubmitting}
+        initialCategory={editingPost?.category ?? null}
+        initialVisibility={editingPost?.visibility ?? 'public'}
+        submitLabel={isEditing ? '수정하기' : '등록하기'}
         onClose={() => setIsSettingsVisible(false)}
-        onSubmit={(_category, _visibility) => {
-          setIsSettingsVisible(false);
-          // TODO: 실제 등록 API 연결
-        }}
+        onSubmit={handleSubmitPost}
       />
 
       <AIBottomSheet
         visible={isSheetVisible}
         content={text}
-        aiResponse={currentResponse}
+        aiResponse={whaleMessage}
+        isLoading={isWhaleLoading}
+        errorMessage={whaleError}
         onClose={() => setIsSheetVisible(false)}
         onRefresh={handleRefresh}
         onApply={handleApply}
@@ -216,6 +391,13 @@ const styles = StyleSheet.create({
   },
   contentArea: {
     flex: 1,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    zIndex: 1,
   },
   gridWrapper: {
     paddingHorizontal: 20,

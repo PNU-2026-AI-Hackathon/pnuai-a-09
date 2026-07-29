@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   KeyboardAvoidingView,
@@ -19,11 +21,17 @@ import {
 
 import type { FeedComment, FeedPost } from '@/src/types/api/feed-post';
 
+import { ConfirmModal } from '@/components/confirm-modal';
+import { useCurrentUserId } from '@/hooks/use-current-user-id';
 import { darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
-import { createComment, toggleCommentLike, togglePostLike } from '@/src/services/posts';
+import { blockUser } from '@/src/services/blocks';
+import { createComment, deletePost, toggleCommentLike, togglePostLike } from '@/src/services/posts';
+import { createReport } from '@/src/services/reports';
 
 type Props = {
   post: FeedPost;
+  /** 삭제가 끝났을 때. 목록을 들고 있는 화면이 직접 정리하고 싶을 때 쓴다 */
+  onDeleted?: (postId: string) => void;
 };
 
 function ProfileAvatar({ uri, size }: { uri: string | null; size: number }) {
@@ -223,7 +231,22 @@ function CommentItem({
   );
 }
 
-export function FeedPostCard({ post }: Props) {
+export function FeedPostCard({ post, onDeleted }: Props) {
+  const router = useRouter();
+  // FriendsProvider 는 home 탭에만 있어서, 보관함·프로필 탭에서도 쓰이는 이 카드는
+  // 컨텍스트 대신 프로바이더에 의존하지 않는 훅을 쓴다.
+  const currentUserId = useCurrentUserId();
+  const isOwner = currentUserId != null && currentUserId === post.user_id;
+
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
+  const [isReportConfirmOpen, setIsReportConfirmOpen] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+  // 목록을 들고 있는 화면이 여러 곳이라, 삭제되면 카드가 스스로 사라진다.
+  const [isDeleted, setIsDeleted] = useState(false);
+
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isCommentsMounted, setIsCommentsMounted] = useState(false);
   const [draftComment, setDraftComment] = useState('');
@@ -427,6 +450,74 @@ export function FeedPostCard({ post }: Props) {
     }
   };
 
+  const handleEdit = () => {
+    setIsPostMenuOpen(false);
+    router.push({ pathname: '/(tabs)/write', params: { postId: post.id } });
+  };
+
+  const handleDelete = async () => {
+    if (isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deletePost(post.id);
+      setIsDeleteConfirmOpen(false);
+      setIsDeleted(true);
+      onDeleted?.(post.id);
+    } catch (error) {
+      setIsDeleteConfirmOpen(false);
+      Alert.alert(error instanceof Error ? error.message : '게시글 삭제에 실패했습니다.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleBlock = async () => {
+    if (isBlocking) {
+      return;
+    }
+
+    setIsBlocking(true);
+    try {
+      await blockUser(post.user_id);
+      setIsBlockConfirmOpen(false);
+      // 차단하면 이 사람 글은 더 이상 보이면 안 되므로 카드를 즉시 걷어낸다.
+      setIsDeleted(true);
+      onDeleted?.(post.id);
+      // 친구 목록은 화면에 다시 들어올 때 갱신된다. 차단당한 사람의 글은 RLS 가
+      // 이미 가리므로, 목록이 잠깐 낡아도 내용이 새는 일은 없다.
+    } catch (error) {
+      setIsBlockConfirmOpen(false);
+      Alert.alert(error instanceof Error ? error.message : '차단하지 못했습니다.');
+    } finally {
+      setIsBlocking(false);
+    }
+  };
+
+  const handleReport = async () => {
+    if (isReporting) {
+      return;
+    }
+
+    setIsReporting(true);
+    try {
+      await createReport({ targetType: 'post', targetId: post.id });
+      setIsReportConfirmOpen(false);
+      Alert.alert('신고가 접수되었어요.');
+    } catch (error) {
+      setIsReportConfirmOpen(false);
+      Alert.alert(error instanceof Error ? error.message : '신고를 접수하지 못했습니다.');
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
+  if (isDeleted) {
+    return null;
+  }
+
   return (
     <View style={styles.card}>
       {isPostMenuOpen ? (
@@ -463,12 +554,47 @@ export function FeedPostCard({ post }: Props) {
                 </Pressable>
                 {isPostMenuOpen ? (
                   <View style={styles.postMenu}>
-                    <Pressable accessibilityRole="button" style={styles.postMenuItem}>
-                      <Text style={styles.postMenuEdit}>수정</Text>
-                    </Pressable>
-                    <Pressable accessibilityRole="button" style={styles.postMenuItem}>
-                      <Text style={styles.postMenuDelete}>삭제</Text>
-                    </Pressable>
+                    {/* 내 글은 수정·삭제, 친구 글은 차단·신고 */}
+                    {isOwner ? (
+                      <>
+                        <Pressable
+                          accessibilityRole="button"
+                          style={styles.postMenuItem}
+                          onPress={handleEdit}>
+                          <Text style={styles.postMenuEdit}>수정</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          style={styles.postMenuItem}
+                          onPress={() => {
+                            setIsPostMenuOpen(false);
+                            setIsDeleteConfirmOpen(true);
+                          }}>
+                          <Text style={styles.postMenuDelete}>삭제</Text>
+                        </Pressable>
+                      </>
+                    ) : (
+                      <>
+                        <Pressable
+                          accessibilityRole="button"
+                          style={styles.postMenuItem}
+                          onPress={() => {
+                            setIsPostMenuOpen(false);
+                            setIsBlockConfirmOpen(true);
+                          }}>
+                          <Text style={styles.postMenuEdit}>차단</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          style={styles.postMenuItem}
+                          onPress={() => {
+                            setIsPostMenuOpen(false);
+                            setIsReportConfirmOpen(true);
+                          }}>
+                          <Text style={styles.postMenuDelete}>신고</Text>
+                        </Pressable>
+                      </>
+                    )}
                   </View>
                 ) : null}
               </View>
@@ -628,6 +754,40 @@ export function FeedPostCard({ post }: Props) {
           </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <ConfirmModal
+        visible={isDeleteConfirmOpen}
+        title="이 게시글을 삭제할까요?"
+        message="삭제하면 사진과 댓글도 함께 사라지고 되돌릴 수 없어요."
+        confirmLabel="삭제"
+        destructive
+        isPending={isDeleting}
+        onConfirm={handleDelete}
+        onCancel={() => setIsDeleteConfirmOpen(false)}
+      />
+
+      <ConfirmModal
+        visible={isBlockConfirmOpen}
+        title={`${post.username}님을 차단할까요?`}
+        message="친구 관계가 해제되고 서로의 게시글이 보이지 않게 돼요. 설정에서 다시 해제할 수 있어요."
+        confirmLabel="차단"
+        destructive
+        isPending={isBlocking}
+        onConfirm={handleBlock}
+        onCancel={() => setIsBlockConfirmOpen(false)}
+      />
+
+      {/* 신고 사유 선택은 디자인 확정 후 추가한다. 지금은 사유 없이 접수만 한다. */}
+      <ConfirmModal
+        visible={isReportConfirmOpen}
+        title="이 게시글을 신고할까요?"
+        message="신고 내용은 운영팀이 확인해요."
+        confirmLabel="신고"
+        destructive
+        isPending={isReporting}
+        onConfirm={handleReport}
+        onCancel={() => setIsReportConfirmOpen(false)}
+      />
     </View>
   );
 }

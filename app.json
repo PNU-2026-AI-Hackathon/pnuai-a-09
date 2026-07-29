@@ -2,7 +2,7 @@
   "expo": {
     "name": "whale-app",
     "slug": "whale-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icons/whale1.png",
     "scheme": "whaleapp",
@@ -27,7 +27,6 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
-      
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -37,7 +36,7 @@
         "expo-build-properties",
         {
           "android": {
-            "kotlinVersion": "2.0.21" 
+            "kotlinVersion": "2.0.21"
           }
         }
       ],
