@@ -32,6 +32,17 @@ export type SaveMemoryParams = {
   /** AI 버튼을 누른 시점의 원문. 유저가 고친 버전이 아니다 */
   originalText: string;
   draftId: string;
+  /** "적용하기" 시점에 화면에 떠 있던 고래 한마디 */
+  whaleMessage: string;
+  /** "다른 한마디"를 누른 횟수 */
+  retryCount: number;
+};
+
+export type FinalizeMemoryParams = {
+  /** saveWhaleMemory 때 쓴 것과 같은 draftId */
+  draftId: string;
+  /** 실제로 "등록"된 최종 텍스트 */
+  editedText: string;
 };
 
 /**
@@ -60,7 +71,11 @@ async function getAccessToken(): Promise<string> {
   return data.session.access_token;
 }
 
-async function requestAI<T>(path: string, body: Record<string, unknown>): Promise<T> {
+async function requestAI<T>(
+  path: string,
+  body: Record<string, unknown>,
+  method: 'POST' | 'PATCH' = 'POST',
+): Promise<T> {
   if (!AI_API_URL) {
     throw new Error('EXPO_PUBLIC_AI_API_URL 환경 변수를 확인해주세요.');
   }
@@ -72,7 +87,7 @@ async function requestAI<T>(path: string, body: Record<string, unknown>): Promis
   let response: Response;
   try {
     response = await fetch(`${AI_API_URL}${path}`, {
-      method: 'POST',
+      method,
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
@@ -125,7 +140,12 @@ export async function fetchWhaleMessage({
  * 고친 버전이 아니라 원문을 보내는 이유: 고래의 한마디를 듣고 다듬은 글은 이미
  * 긍정적으로 재구성돼 있어서, 나중에 비슷한 감정을 찾을 때 원래 감정과 멀어진다.
  */
-export async function saveWhaleMemory({ originalText, draftId }: SaveMemoryParams): Promise<void> {
+export async function saveWhaleMemory({
+  originalText,
+  draftId,
+  whaleMessage,
+  retryCount,
+}: SaveMemoryParams): Promise<void> {
   const trimmed = originalText.trim();
   if (!trimmed) {
     return;
@@ -134,5 +154,32 @@ export async function saveWhaleMemory({ originalText, draftId }: SaveMemoryParam
   await requestAI<{ ok: boolean }>('/ai/memory', {
     original_text: trimmed,
     draft_id: draftId,
+    whale_message: whaleMessage,
+    retry_count: retryCount,
   });
+}
+
+/**
+ * "적용하기" 이후 실제로 등록된 최종 텍스트를 같은 draftId 행에 채워 넣는다.
+ *
+ * "등록"을 눌러 게시글 저장이 성공한 직후에만 호출한다. 적용만 하고 등록을
+ * 안 했다면 이 함수는 호출되지 않고, 서버의 edited_text는 계속 NULL로 남는다.
+ */
+export async function finalizeWhaleMemory({
+  draftId,
+  editedText,
+}: FinalizeMemoryParams): Promise<void> {
+  const trimmed = editedText.trim();
+  if (!trimmed) {
+    return;
+  }
+
+  await requestAI<{ ok: boolean }>(
+    '/ai/memory',
+    {
+      draft_id: draftId,
+      edited_text: trimmed,
+    },
+    'PATCH',
+  );
 }
