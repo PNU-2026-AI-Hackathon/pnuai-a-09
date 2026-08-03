@@ -32,7 +32,7 @@ import {
   primary,
   white,
 } from '@/constants/theme';
-import { createDraftId, fetchWhaleMessage, saveWhaleMemory } from '@/src/services/ai';
+import { createDraftId, fetchWhaleMessage, finalizeWhaleMemory, saveWhaleMemory } from '@/src/services/ai';
 import { createPost, fetchPostForEdit, updatePost, type EditablePost } from '@/src/services/posts';
 import type { PostVisibility } from '@/src/types/api/feed-post';
 
@@ -71,11 +71,16 @@ export default function WritePage() {
   const [whaleError, setWhaleError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
+  // "적용하기"를 누른 draftId. 등록이 성공하면 이 draft 행에 최종 텍스트를 채운다.
+  // 세션 중 AI 버튼을 여러 번 눌러도 마지막으로 적용된 draft만 최종본과 연결한다.
+  const appliedDraftIdRef = useRef<string | null>(null);
+
   const resetForm = useCallback(() => {
     setText('');
     setImages([]);
     setEditingPost(null);
     draftRef.current = null;
+    appliedDraftIdRef.current = null;
     setWhaleMessage('');
     setWhaleError(null);
     setRetryCount(0);
@@ -193,6 +198,15 @@ export default function WritePage() {
         });
       }
 
+      // 등록 성공 시점에만 최종 수정본을 기록한다. resetForm이 ref를 지우기 전에
+      // 여기서 먼저 읽어야 한다.
+      const appliedDraftId = appliedDraftIdRef.current;
+      if (appliedDraftId) {
+        finalizeWhaleMemory({ draftId: appliedDraftId, editedText: text }).catch((error) => {
+          console.warn('[ai] 장기기억 최종본 저장 실패', error);
+        });
+      }
+
       setIsSettingsVisible(false);
       resetForm();
       // 수정 모드로 다시 들어오지 않도록 파라미터를 지운다 (탭은 계속 살아 있다).
@@ -213,7 +227,13 @@ export default function WritePage() {
     // 장기기억은 다음 한마디의 품질을 위한 부가 기능이다.
     const draft = draftRef.current;
     if (draft) {
-      saveWhaleMemory({ originalText: draft.original, draftId: draft.draftId }).catch((error) => {
+      appliedDraftIdRef.current = draft.draftId;
+      saveWhaleMemory({
+        originalText: draft.original,
+        draftId: draft.draftId,
+        whaleMessage,
+        retryCount,
+      }).catch((error) => {
         console.warn('[ai] 장기기억 저장 실패', error);
       });
     }
