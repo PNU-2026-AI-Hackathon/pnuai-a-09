@@ -1,4 +1,4 @@
-import { supabase } from '@/src/lib/supabase';
+import { supabase } from "@/src/lib/supabase";
 
 /**
  * 칭찬고래 AI 서버(whale-AI) 클라이언트.
@@ -28,6 +28,12 @@ export type WhaleMessageParams = {
   retryCount?: number;
 };
 
+export type RejectedMessage = {
+  /** 이 시도에서 나왔다가 "다른 한마디"로 거절된 한마디 */
+  whaleMessage: string;
+  retryCount: number;
+};
+
 export type SaveMemoryParams = {
   /** AI 버튼을 누른 시점의 원문. 유저가 고친 버전이 아니다 */
   originalText: string;
@@ -36,6 +42,8 @@ export type SaveMemoryParams = {
   whaleMessage: string;
   /** "다른 한마디"를 누른 횟수 */
   retryCount: number;
+  /** 같은 draft 안에서 whaleMessage 이전에 나왔다가 거절된 제안들 */
+  rejectedMessages: RejectedMessage[];
 };
 
 export type FinalizeMemoryParams = {
@@ -53,9 +61,9 @@ export type FinalizeMemoryParams = {
  * 네이티브 모듈이라 추가하면 앱을 다시 빌드해야 하므로 쓰지 않는다.
  */
 export function createDraftId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
 }
@@ -65,7 +73,7 @@ async function getAccessToken(): Promise<string> {
   const { data, error } = await supabase.auth.getSession();
 
   if (error || !data.session) {
-    throw new Error('로그인이 필요합니다.');
+    throw new Error("로그인이 필요합니다.");
   }
 
   return data.session.access_token;
@@ -74,13 +82,14 @@ async function getAccessToken(): Promise<string> {
 async function requestAI<T>(
   path: string,
   body: Record<string, unknown>,
-  method: 'POST' | 'PATCH' = 'POST',
+  method: "POST" | "PATCH" = "POST",
 ): Promise<T> {
   if (!AI_API_URL) {
-    throw new Error('EXPO_PUBLIC_AI_API_URL 환경 변수를 확인해주세요.');
+    throw new Error("EXPO_PUBLIC_AI_API_URL 환경 변수를 확인해주세요.");
   }
 
   const token = await getAccessToken();
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -89,26 +98,26 @@ async function requestAI<T>(
     response = await fetch(`${AI_API_URL}${path}`, {
       method,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('응답이 너무 늦어요. 잠시 후 다시 시도해 주세요.');
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("응답이 너무 늦어요. 잠시 후 다시 시도해 주세요.");
     }
-    throw new Error('네트워크 연결을 확인해 주세요.');
+    throw new Error("네트워크 연결을 확인해 주세요.");
   } finally {
     clearTimeout(timer);
   }
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error('로그인이 필요합니다.');
+      throw new Error("로그인이 필요합니다.");
     }
-    throw new Error('고래가 잠시 쉬고 있어요. 잠시 후 다시 시도해 주세요.');
+    throw new Error("고래가 잠시 쉬고 있어요. 잠시 후 다시 시도해 주세요.");
   }
 
   return (await response.json()) as T;
@@ -122,10 +131,10 @@ export async function fetchWhaleMessage({
 }: WhaleMessageParams): Promise<string> {
   const trimmed = diary.trim();
   if (!trimmed) {
-    throw new Error('일기를 먼저 작성해 주세요.');
+    throw new Error("일기를 먼저 작성해 주세요.");
   }
 
-  const data = await requestAI<{ whale: string }>('/ai/whale-message', {
+  const data = await requestAI<{ whale: string }>("/ai/whale-message", {
     diary: trimmed,
     draft_id: draftId,
     retry_count: retryCount,
@@ -145,17 +154,22 @@ export async function saveWhaleMemory({
   draftId,
   whaleMessage,
   retryCount,
+  rejectedMessages,
 }: SaveMemoryParams): Promise<void> {
   const trimmed = originalText.trim();
   if (!trimmed) {
     return;
   }
 
-  await requestAI<{ ok: boolean }>('/ai/memory', {
+  await requestAI<{ ok: boolean }>("/ai/memory", {
     original_text: trimmed,
     draft_id: draftId,
     whale_message: whaleMessage,
     retry_count: retryCount,
+    rejected_messages: rejectedMessages.map((m) => ({
+      whale_message: m.whaleMessage,
+      retry_count: m.retryCount,
+    })),
   });
 }
 
@@ -175,11 +189,11 @@ export async function finalizeWhaleMemory({
   }
 
   await requestAI<{ ok: boolean }>(
-    '/ai/memory',
+    "/ai/memory",
     {
       draft_id: draftId,
       edited_text: trimmed,
     },
-    'PATCH',
+    "PATCH",
   );
 }

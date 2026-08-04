@@ -16,27 +16,33 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ConfirmModal } from "@/components/confirm-modal";
 import {
   background,
   darkGray,
   FontFamily,
   gray,
   lightGray,
+  red,
   white,
 } from "@/constants/theme";
 import { supabase } from "@/src/lib/supabase";
 import { FeedPostCard } from "@/src/pages/feed/post-card";
+import { blockUser } from "@/src/services/blocks";
 import { fetchAcceptedFriendIds } from "@/src/services/friends";
 import {
   fetchUserPostsByCategory,
   type PostSortOrder,
 } from "@/src/services/posts";
+import { createReport } from "@/src/services/reports";
 import {
   fetchUserById,
   saveCoverImage,
   type AppUser,
 } from "@/src/services/users";
 import type { FeedPost } from "@/src/types/api/feed-post";
+
+const cryingWhaleImage = require("../../../assets/icons/crying_whale.png");
 
 const SORT_LABELS: Record<PostSortOrder, string> = {
   latest: "최신순",
@@ -69,6 +75,16 @@ export default function FriendProfilePage() {
     right: number;
   } | null>(null);
   const sortButtonRef = useRef<View | null>(null);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [moreMenuPosition, setMoreMenuPosition] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
+  const moreButtonRef = useRef<View | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"block" | "report" | null>(
+    null,
+  );
+  const [isConfirmPending, setIsConfirmPending] = useState(false);
   // 방금 고른 커버(로컬 미리보기). 저장 성공 시 user.cover_image_url 로 대체된다.
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isSavingCover, setIsSavingCover] = useState(false);
@@ -225,6 +241,65 @@ export default function FriendProfilePage() {
     });
   };
 
+  // 더보기(⋮)도 정렬 메뉴와 같은 이유로 화면 좌표에 띄운다 — 리스트 헤더 안에 두면 잘린다.
+  const toggleMoreMenu = () => {
+    if (isMoreMenuOpen) {
+      setIsMoreMenuOpen(false);
+      return;
+    }
+
+    moreButtonRef.current?.measureInWindow((x, y, width, height) => {
+      const screenWidth = Dimensions.get("window").width;
+      setMoreMenuPosition({
+        top: y + height + 6,
+        right: screenWidth - (x + width),
+      });
+      setIsMoreMenuOpen(true);
+    });
+  };
+
+  const handleBlock = async () => {
+    if (!params.userId || isConfirmPending) {
+      return;
+    }
+
+    setIsConfirmPending(true);
+    try {
+      await blockUser(params.userId);
+      setConfirmAction(null);
+      // 차단하면 이 사람 프로필은 더 이상 볼 수 없으므로 이전 화면으로 돌아간다.
+      router.back();
+    } catch (error) {
+      setConfirmAction(null);
+      Alert.alert(
+        error instanceof Error ? error.message : "차단하지 못했습니다.",
+      );
+    } finally {
+      setIsConfirmPending(false);
+    }
+  };
+
+  const handleReport = async () => {
+    if (!params.userId || isConfirmPending) {
+      return;
+    }
+
+    setIsConfirmPending(true);
+    try {
+      // 신고 사유 선택은 디자인 확정 후 추가한다. 지금은 사유 없이 접수만 한다.
+      await createReport({ targetType: "user", targetId: params.userId });
+      setConfirmAction(null);
+      Alert.alert("신고가 접수되었어요.");
+    } catch (error) {
+      setConfirmAction(null);
+      Alert.alert(
+        error instanceof Error ? error.message : "신고를 접수하지 못했습니다.",
+      );
+    } finally {
+      setIsConfirmPending(false);
+    }
+  };
+
   const renderItem: ListRenderItem<FeedPost> = ({ item }) => (
     <FeedPostCard post={item} />
   );
@@ -267,13 +342,23 @@ export default function FriendProfilePage() {
               <View style={[styles.avatar, styles.avatarPlaceholder]} />
             )}
           </View>
-          {/*<Pressable*/}
-          {/*  accessibilityRole="button"*/}
-          {/*  accessibilityLabel="더보기"*/}
-          {/*  hitSlop={10}*/}
-          {/*  style={({ pressed }) => pressed && styles.pressed}>*/}
-          {/*  <Ionicons name="ellipsis-vertical" size={20} color={gray} />*/}
-          {/*</Pressable>*/}
+          {/* 내 프로필에서는 나를 차단·신고할 일이 없으니 감춘다. */}
+          {isOwnProfile ? null : (
+            <View ref={moreButtonRef} collapsable={false}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="더보기"
+                hitSlop={10}
+                onPress={toggleMoreMenu}
+                style={({ pressed }) => [
+                  styles.moreButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Ionicons name="ellipsis-vertical" size={20} color={gray} />
+              </Pressable>
+            </View>
+          )}
         </View>
 
         <Text style={styles.name} numberOfLines={1}>
@@ -357,7 +442,7 @@ export default function FriendProfilePage() {
         ListHeaderComponent={listHeader}
         ListEmptyComponent={listEmpty}
         contentContainerStyle={styles.listContent}
-        scrollEnabled={!isSortMenuOpen}
+        scrollEnabled={!isSortMenuOpen && !isMoreMenuOpen}
         showsVerticalScrollIndicator={false}
       />
 
@@ -399,6 +484,76 @@ export default function FriendProfilePage() {
         </>
       ) : null}
 
+      {isMoreMenuOpen && moreMenuPosition ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="메뉴 닫기"
+            style={styles.sortMenuBackdrop}
+            onPress={() => setIsMoreMenuOpen(false)}
+          />
+          <View
+            style={[
+              styles.moreMenu,
+              { top: moreMenuPosition.top, right: moreMenuPosition.right },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setIsMoreMenuOpen(false);
+                setConfirmAction("block");
+              }}
+              style={({ pressed }) => [
+                styles.moreMenuItem,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.moreMenuText}>차단</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setIsMoreMenuOpen(false);
+                setConfirmAction("report");
+              }}
+              style={({ pressed }) => [
+                styles.moreMenuItem,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.moreMenuText, styles.moreMenuTextDanger]}>
+                신고
+              </Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
+
+      <ConfirmModal
+        visible={confirmAction === "block"}
+        title={`친구 관계를 정말 해제하시겠습니까?`}
+        message="해제 후에는 서로의 게시글을 볼 수 없어요."
+        confirmLabel="해제"
+        image={cryingWhaleImage}
+        destructive
+        isPending={isConfirmPending}
+        onConfirm={handleBlock}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      {/* 신고 사유 선택은 디자인 확정 후 추가한다. 지금은 사유 없이 접수만 한다. */}
+      <ConfirmModal
+        visible={confirmAction === "report"}
+        title={`${displayName || "이 사용자"}님을 신고할까요?`}
+        message="신고 내용은 운영팀이 확인해요."
+        confirmLabel="신고"
+        destructive
+        isPending={isConfirmPending}
+        onConfirm={handleReport}
+        onCancel={() => setConfirmAction(null)}
+      />
+
       <View
         style={[styles.topBar, { top: insets.top + 4 }]}
         pointerEvents="box-none"
@@ -419,6 +574,7 @@ export default function FriendProfilePage() {
           accessibilityRole="button"
           accessibilityLabel="설정"
           hitSlop={10}
+          onPress={() => router.push("/(tabs)/profile/settings")}
           style={({ pressed }) => [
             styles.topBarButton,
             pressed && styles.pressed,
@@ -581,6 +737,41 @@ const styles = StyleSheet.create({
   },
   sortMenuTextSelected: {
     color: darkGray,
+  },
+  moreButton: {
+    width: 28,
+    height: 28,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+  moreMenu: {
+    position: "absolute",
+    minWidth: 104,
+    backgroundColor: white,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 30,
+  },
+  moreMenuItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 6,
+    alignItems: "center",
+  },
+  moreMenuText: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  moreMenuTextDanger: {
+    color: red,
   },
   emptyBox: {
     paddingTop: 60,

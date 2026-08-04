@@ -51,6 +51,7 @@ export function HomeHeader({ active }: { active: 'feed' | 'group' }) {
             accessibilityRole="button"
             accessibilityLabel="설정"
             hitSlop={8}
+            onPress={() => router.push('/(tabs)/profile/settings')}
             style={styles.iconHit}>
             <Ionicons name="settings-outline" size={22} color={darkGray} />
           </Pressable>

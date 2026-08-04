@@ -359,6 +359,7 @@ export default function ProfilePage() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="설정"
+          onPress={() => router.push('/(tabs)/profile/settings')}
           style={({ pressed }) => [styles.iconHit, pressed && styles.iconPressed]}>
           <Ionicons name="settings-outline" size={22} color={darkGray} />
         </Pressable>

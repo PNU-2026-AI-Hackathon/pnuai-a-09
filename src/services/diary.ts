@@ -1,3 +1,5 @@
+import { File } from 'expo-file-system';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { ImageSourcePropType } from 'react-native';
 
 import { supabase } from '@/src/lib/supabase';
@@ -25,6 +27,13 @@ export type DiaryCategory = {
   title: string;
   postCount: number;
   image?: ImageSourcePropType;
+};
+
+/** 사용자가 직접 만든 카테고리 행. (diary_categories) */
+export type DiaryCategoryRow = {
+  title: string;
+  /** 등록할 때 고른 대표 이미지. null 이면 최신 게시글 사진을 쓴다 */
+  imageUrl: string | null;
 };
 
 export type DiaryArchive = {
@@ -62,9 +71,12 @@ function getMonthRange(year: number, month: number) {
   };
 }
 
-export async function fetchDiaryArchiveByUserId(userId: string, year: number, month: number): Promise<DiaryArchive> {
-  const { start, end } = getMonthRange(year, month);
-  const { data: posts, error: postsError } = await supabase
+/** 다이어리에 필요한 글 목록. range 를 주면 그 기간만, 없으면 전체 기간을 가져온다. */
+async function fetchDiaryPosts(
+  userId: string,
+  range?: { start: string; end: string },
+): Promise<DiaryPostRow[] | null> {
+  let query = supabase
     .from('posts')
     .select(
       `
@@ -77,25 +89,44 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
       )
     `,
     )
-    .eq('user_id', userId)
-    .gte('created_at', start)
-    .lt('created_at', end)
-    .order('created_at', { ascending: true })
-    .returns<DiaryPostRow[]>();
+    .eq('user_id', userId);
 
-  if (postsError || !posts) {
+  if (range) {
+    query = query.gte('created_at', range.start).lt('created_at', range.end);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: true }).returns<DiaryPostRow[]>();
+
+  if (error || !data) {
     console.warn('[diary] Failed to load archive', {
-      code: postsError?.code,
-      message: postsError?.message,
-      details: postsError?.details,
-      hint: postsError?.hint,
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
     });
+    return null;
+  }
+
+  return data;
+}
+
+/**
+ * 캘린더는 선택한 달만, 카테고리(폴더)는 전체 기간을 기준으로 만든다.
+ * 8월 캘린더를 보고 있어도 카테고리는 여태 쓴 글 전부를 세고 대표 사진도 그중에서 고른다.
+ */
+export async function fetchDiaryArchiveByUserId(userId: string, year: number, month: number): Promise<DiaryArchive> {
+  const [monthPosts, allPosts] = await Promise.all([
+    fetchDiaryPosts(userId, getMonthRange(year, month)),
+    fetchDiaryPosts(userId),
+  ]);
+
+  if (!monthPosts || !allPosts) {
     return EMPTY_ARCHIVE;
   }
 
   const entriesByDay = new Map<number, DiaryEntry>();
 
-  posts.forEach((post) => {
+  monthPosts.forEach((post) => {
     const day = new Date(post.created_at).getDate();
     const sortedImages = [...post.post_images].sort((a, b) => a.sort_order - b.sort_order);
     const image = getPostImageSource(sortedImages[0]?.image_url ?? null);
@@ -113,17 +144,20 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
   const entries = [...entriesByDay.values()];
   const categoriesByName = new Map<string, DiaryCategory>();
 
-  // 카테고리를 고르지 않은 글의 대표 이미지. '전체'가 쓸 수 있게 따로 챙겨 둔다.
-  let uncategorizedImage: DiaryCategory['image'];
+  // 전체 폴더가 쓸 대표 이미지 — 가장 최근에 올린 사진.
+  let latestPostImage: DiaryCategory['image'];
 
-  posts.forEach((post) => {
+  // allPosts 는 오래된 글부터 온다. 사진이 있는 글을 만날 때마다 덮어쓰면
+  // 마지막에 남는 건 '가장 최신 사진'이 된다.
+  allPosts.forEach((post) => {
     const title = post.category?.trim();
     const sortedImages = [...post.post_images].sort((a, b) => a.sort_order - b.sort_order);
     const image = getPostImageSource(sortedImages[0]?.image_url ?? null);
 
+    latestPostImage = image ?? latestPostImage;
+
     // 카테고리가 없는 글은 '미분류'로 따로 묶지 않고 '전체'에만 포함한다.
     if (!title) {
-      uncategorizedImage = uncategorizedImage ?? image;
       return;
     }
 
@@ -133,22 +167,28 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
       id: current?.id ?? title.toLowerCase().replace(/\s+/g, '-'),
       title,
       postCount: (current?.postCount ?? 0) + 1,
-      image: current?.image ?? image,
+      image: image ?? current?.image,
     });
   });
 
-  // 사용자가 직접 만든(글이 아직 없는) 카테고리도 함께 표시한다.
-  const savedTitles = await fetchDiaryCategories(userId);
-  savedTitles.forEach((rawTitle) => {
-    const title = rawTitle.trim();
-    if (!title || categoriesByName.has(title)) {
+  // 사용자가 직접 만든 카테고리를 얹는다.
+  //   - 등록할 때 고른 썸네일이 있으면 그걸로 고정한다(최신 글 사진보다 우선).
+  //   - 아직 글이 없는 카테고리도 빈 폴더로 보여 준다.
+  const savedCategories = await fetchDiaryCategoryRows(userId);
+  savedCategories.forEach((row) => {
+    const title = row.title.trim();
+    if (!title) {
       return;
     }
 
+    const current = categoriesByName.get(title);
+    const pinnedImage = row.imageUrl ? { uri: row.imageUrl } : undefined;
+
     categoriesByName.set(title, {
-      id: title.toLowerCase().replace(/\s+/g, '-'),
+      id: current?.id ?? title.toLowerCase().replace(/\s+/g, '-'),
       title,
-      postCount: 0,
+      postCount: current?.postCount ?? 0,
+      image: pinnedImage ?? current?.image,
     });
   });
 
@@ -158,10 +198,8 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
       {
         id: 'all',
         title: '전체',
-        postCount: posts.length,
-        image:
-          [...categoriesByName.values()].find((category) => category.image)?.image ??
-          uncategorizedImage,
+        postCount: allPosts.length,
+        image: latestPostImage,
       },
       ...categoriesByName.values(),
     ],
@@ -169,35 +207,106 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
 }
 
 /**
- * 사용자가 직접 만든 다이어리 카테고리 제목 목록. (diary_categories 테이블)
+ * 사용자가 직접 만든 다이어리 카테고리. (diary_categories 테이블)
  * 테이블이 없거나 RLS 로 막히면 빈 배열을 반환해 다이어리 로딩을 깨지 않는다.
  */
-export async function fetchDiaryCategories(userId: string): Promise<string[]> {
+export async function fetchDiaryCategoryRows(userId: string): Promise<DiaryCategoryRow[]> {
   const { data, error } = await supabase
     .from('diary_categories')
-    .select('title')
+    .select('title, image_url')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
-    .returns<{ title: string }[]>();
+    .returns<{ title: string; image_url: string | null }[]>();
 
   if (error || !data) {
     return [];
   }
 
-  return data.map((row) => row.title);
+  return data.map((row) => ({ title: row.title, imageUrl: row.image_url ?? null }));
 }
 
-/** 새 다이어리 카테고리를 생성한다. (제목만) */
-export async function createDiaryCategory(userId: string, title: string): Promise<void> {
+/** 카테고리 제목만 필요한 화면(글쓰기 시트 등)을 위한 얇은 래퍼. */
+export async function fetchDiaryCategories(userId: string): Promise<string[]> {
+  const rows = await fetchDiaryCategoryRows(userId);
+
+  return rows.map((row) => row.title);
+}
+
+/**
+ * 카테고리 썸네일 업로드 기준(긴 변).
+ * 폴더 안에서 55×52pt 로만 보이므로 800px 이면 고해상도 기기에서도 넘친다.
+ */
+const CATEGORY_IMAGE_MAX_DIMENSION = 800;
+const CATEGORY_IMAGE_QUALITY = 0.8;
+
+/**
+ * 카테고리 썸네일을 'profiles' 버킷의 {userId}/diary-categories/ 로 올리고 공개 URL 을 반환한다.
+ *
+ * 새 버킷을 만들지 않은 이유: 첫 폴더가 본인 userId 라서 프로필·커버 이미지에 걸린
+ * 스토리지 정책이 그대로 적용된다.
+ * React Native 에서는 Blob/FormData 업로드가 정상 동작하지 않아 바이트로 올린다.
+ */
+export async function uploadDiaryCategoryImage(userId: string, localUri: string): Promise<string> {
+  let uploadUri = localUri;
+
+  // 사진첩 원본은 수 MB 를 넘기도 한다. 썸네일에는 과분하므로 줄여서 올린다.
+  // 변환에 실패하면 원본을 그대로 올린다 — 조금 큰 게 등록 실패보다 낫다.
+  try {
+    const context = ImageManipulator.manipulate(localUri);
+    const rendered = await context.renderAsync();
+    const longestSide = Math.max(rendered.width, rendered.height);
+
+    if (longestSide > CATEGORY_IMAGE_MAX_DIMENSION) {
+      const scale = CATEGORY_IMAGE_MAX_DIMENSION / longestSide;
+      context.resize({
+        width: Math.round(rendered.width * scale),
+        height: Math.round(rendered.height * scale),
+      });
+    }
+
+    const result = await (await context.renderAsync()).saveAsync({
+      format: SaveFormat.JPEG,
+      compress: CATEGORY_IMAGE_QUALITY,
+    });
+
+    uploadUri = result.uri;
+  } catch (error) {
+    console.warn('[diary] Failed to compress category image, uploading original', error);
+  }
+
+  const bytes = await new File(uploadUri).bytes();
+  const path = `${userId}/diary-categories/${Date.now()}.jpg`;
+
+  const { error } = await supabase.storage.from('profiles').upload(path, bytes, {
+    contentType: 'image/jpeg',
+    upsert: true,
+  });
+
+  if (error) {
+    throw new Error(error.message ?? '카테고리 이미지 업로드에 실패했습니다.');
+  }
+
+  return supabase.storage.from('profiles').getPublicUrl(path).data.publicUrl;
+}
+
+/** 새 다이어리 카테고리를 생성한다. 썸네일(localImageUri)은 선택이다. */
+export async function createDiaryCategory(
+  userId: string,
+  title: string,
+  localImageUri?: string | null,
+): Promise<void> {
   const trimmed = title.trim();
 
   if (!trimmed) {
     throw new Error('카테고리명을 입력해 주세요.');
   }
 
+  const imageUrl = localImageUri ? await uploadDiaryCategoryImage(userId, localImageUri) : null;
+
   const { error } = await supabase.from('diary_categories').insert({
     user_id: userId,
     title: trimmed,
+    image_url: imageUrl,
   });
 
   if (error) {
