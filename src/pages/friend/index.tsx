@@ -29,12 +29,12 @@ import {
 import { supabase } from "@/src/lib/supabase";
 import { FeedPostCard } from "@/src/pages/feed/post-card";
 import { blockUser } from "@/src/services/blocks";
-import { createReport } from "@/src/services/reports";
 import { fetchAcceptedFriendIds } from "@/src/services/friends";
 import {
   fetchUserPostsByCategory,
   type PostSortOrder,
 } from "@/src/services/posts";
+import { createReport } from "@/src/services/reports";
 import {
   fetchUserById,
   saveCoverImage,
@@ -532,9 +532,9 @@ export default function FriendProfilePage() {
 
       <ConfirmModal
         visible={confirmAction === "block"}
-        title={`${displayName || "이 사용자"}님을 정말 차단하시겠습니까?`}
-        message="차단 후에는 친구 관계가 해제되고 서로의 게시글을 볼 수 없어요."
-        confirmLabel="차단"
+        title={`친구 관계를 정말 해제하시겠습니까?`}
+        message="해제 후에는 서로의 게시글을 볼 수 없어요."
+        confirmLabel="해제"
         image={cryingWhaleImage}
         destructive
         isPending={isConfirmPending}

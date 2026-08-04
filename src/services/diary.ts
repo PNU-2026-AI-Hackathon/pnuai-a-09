@@ -62,9 +62,12 @@ function getMonthRange(year: number, month: number) {
   };
 }
 
-export async function fetchDiaryArchiveByUserId(userId: string, year: number, month: number): Promise<DiaryArchive> {
-  const { start, end } = getMonthRange(year, month);
-  const { data: posts, error: postsError } = await supabase
+/** 다이어리에 필요한 글 목록. range 를 주면 그 기간만, 없으면 전체 기간을 가져온다. */
+async function fetchDiaryPosts(
+  userId: string,
+  range?: { start: string; end: string },
+): Promise<DiaryPostRow[] | null> {
+  let query = supabase
     .from('posts')
     .select(
       `
@@ -77,25 +80,44 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
       )
     `,
     )
-    .eq('user_id', userId)
-    .gte('created_at', start)
-    .lt('created_at', end)
-    .order('created_at', { ascending: true })
-    .returns<DiaryPostRow[]>();
+    .eq('user_id', userId);
 
-  if (postsError || !posts) {
+  if (range) {
+    query = query.gte('created_at', range.start).lt('created_at', range.end);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: true }).returns<DiaryPostRow[]>();
+
+  if (error || !data) {
     console.warn('[diary] Failed to load archive', {
-      code: postsError?.code,
-      message: postsError?.message,
-      details: postsError?.details,
-      hint: postsError?.hint,
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
     });
+    return null;
+  }
+
+  return data;
+}
+
+/**
+ * 캘린더는 선택한 달만, 카테고리(폴더)는 전체 기간을 기준으로 만든다.
+ * 8월 캘린더를 보고 있어도 카테고리는 여태 쓴 글 전부를 세고 대표 사진도 그중에서 고른다.
+ */
+export async function fetchDiaryArchiveByUserId(userId: string, year: number, month: number): Promise<DiaryArchive> {
+  const [monthPosts, allPosts] = await Promise.all([
+    fetchDiaryPosts(userId, getMonthRange(year, month)),
+    fetchDiaryPosts(userId),
+  ]);
+
+  if (!monthPosts || !allPosts) {
     return EMPTY_ARCHIVE;
   }
 
   const entriesByDay = new Map<number, DiaryEntry>();
 
-  posts.forEach((post) => {
+  monthPosts.forEach((post) => {
     const day = new Date(post.created_at).getDate();
     const sortedImages = [...post.post_images].sort((a, b) => a.sort_order - b.sort_order);
     const image = getPostImageSource(sortedImages[0]?.image_url ?? null);
@@ -116,7 +138,7 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
   // 카테고리를 고르지 않은 글의 대표 이미지. '전체'가 쓸 수 있게 따로 챙겨 둔다.
   let uncategorizedImage: DiaryCategory['image'];
 
-  posts.forEach((post) => {
+  allPosts.forEach((post) => {
     const title = post.category?.trim();
     const sortedImages = [...post.post_images].sort((a, b) => a.sort_order - b.sort_order);
     const image = getPostImageSource(sortedImages[0]?.image_url ?? null);
@@ -158,7 +180,7 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
       {
         id: 'all',
         title: '전체',
-        postCount: posts.length,
+        postCount: allPosts.length,
         image:
           [...categoriesByName.values()].find((category) => category.image)?.image ??
           uncategorizedImage,

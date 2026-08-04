@@ -1,8 +1,23 @@
-import { Image, type ImageSource } from 'expo-image';
-import React from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, type ImageSource } from "expo-image";
+import React from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
+import {
+  darkGray,
+  FontFamily,
+  gray,
+  lightGray,
+  primary,
+  red,
+  white,
+} from "@/constants/theme";
 
 type Props = {
   visible: boolean;
@@ -29,8 +44,8 @@ export function ConfirmModal({
   visible,
   title,
   message,
-  confirmLabel = '확인',
-  cancelLabel = '취소',
+  confirmLabel = "확인",
+  cancelLabel = "취소",
   destructive = false,
   image,
   isPending = false,
@@ -59,7 +74,8 @@ export function ConfirmModal({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={isPending ? undefined : onCancel}>
+      onRequestClose={isPending ? undefined : onCancel}
+    >
       <View style={styles.backdrop}>
         {/* 처리 중에는 배경을 눌러도 닫히지 않는다 */}
         <Pressable
@@ -78,9 +94,13 @@ export function ConfirmModal({
           <View style={styles.buttonRow}>
             <Pressable
               accessibilityRole="button"
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.buttonPressed,
+              ]}
               disabled={isPending}
-              onPress={onCancel}>
+              onPress={onCancel}
+            >
               <Text style={styles.cancelText}>{cancelLabel}</Text>
             </Pressable>
 
@@ -88,13 +108,25 @@ export function ConfirmModal({
 
             <Pressable
               accessibilityRole="button"
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.buttonPressed,
+              ]}
               disabled={isPending}
-              onPress={onConfirm}>
+              onPress={onConfirm}
+            >
               {isPending ? (
-                <ActivityIndicator size="small" color={destructive ? red : primary} />
+                <ActivityIndicator
+                  size="small"
+                  color={destructive ? red : primary}
+                />
               ) : (
-                <Text style={[styles.confirmText, destructive && styles.confirmTextDestructive]}>
+                <Text
+                  style={[
+                    styles.confirmText,
+                    destructive && styles.confirmTextDestructive,
+                  ]}
+                >
                   {confirmLabel}
                 </Text>
               )}
@@ -118,14 +150,28 @@ function IllustratedConfirmModal({
   isPending,
   onConfirm,
   onCancel,
-}: Required<Pick<Props, 'visible' | 'title' | 'confirmLabel' | 'cancelLabel' | 'destructive' | 'image' | 'isPending' | 'onConfirm' | 'onCancel'>> &
-  Pick<Props, 'message'>) {
+}: Required<
+  Pick<
+    Props,
+    | "visible"
+    | "title"
+    | "confirmLabel"
+    | "cancelLabel"
+    | "destructive"
+    | "image"
+    | "isPending"
+    | "onConfirm"
+    | "onCancel"
+  >
+> &
+  Pick<Props, "message">) {
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={isPending ? undefined : onCancel}>
+      onRequestClose={isPending ? undefined : onCancel}
+    >
       <View style={styles.backdrop}>
         <Pressable
           style={StyleSheet.absoluteFill}
@@ -133,7 +179,11 @@ function IllustratedConfirmModal({
           accessible={false}
         />
         <View style={illustrated.card}>
-          <Image source={image} style={illustrated.image} contentFit="contain" />
+          <Image
+            source={image}
+            style={illustrated.image}
+            contentFit="contain"
+          />
 
           <Text style={illustrated.title}>{title}</Text>
           {message ? <Text style={illustrated.message}>{message}</Text> : null}
@@ -147,7 +197,8 @@ function IllustratedConfirmModal({
                 pressed && styles.buttonPressed,
               ]}
               disabled={isPending}
-              onPress={onCancel}>
+              onPress={onCancel}
+            >
               <Text style={illustrated.cancelText}>{cancelLabel}</Text>
             </Pressable>
 
@@ -155,11 +206,14 @@ function IllustratedConfirmModal({
               accessibilityRole="button"
               style={({ pressed }) => [
                 illustrated.button,
-                destructive ? illustrated.confirmButtonDestructive : illustrated.confirmButton,
+                destructive
+                  ? illustrated.confirmButtonDestructive
+                  : illustrated.confirmButton,
                 pressed && styles.buttonPressed,
               ]}
               disabled={isPending}
-              onPress={onConfirm}>
+              onPress={onConfirm}
+            >
               {isPending ? (
                 <ActivityIndicator size="small" color={white} />
               ) : (
@@ -175,14 +229,14 @@ function IllustratedConfirmModal({
 
 const illustrated = StyleSheet.create({
   card: {
-    width: '100%',
+    width: "100%",
     maxWidth: 300,
     backgroundColor: white,
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   image: {
     width: 132,
@@ -190,7 +244,7 @@ const illustrated = StyleSheet.create({
   },
   title: {
     marginTop: 18,
-    textAlign: 'center',
+    textAlign: "center",
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 16,
     lineHeight: 22,
@@ -198,7 +252,7 @@ const illustrated = StyleSheet.create({
   },
   message: {
     marginTop: 8,
-    textAlign: 'center',
+    textAlign: "center",
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 12,
     lineHeight: 18,
@@ -206,16 +260,16 @@ const illustrated = StyleSheet.create({
   },
   buttonRow: {
     marginTop: 20,
-    flexDirection: 'row',
-    alignSelf: 'stretch',
+    flexDirection: "row",
+    alignSelf: "stretch",
     gap: 10,
   },
   button: {
     flex: 1,
     height: 42,
     borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   cancelButton: {
     backgroundColor: lightGray,
@@ -241,34 +295,33 @@ const illustrated = StyleSheet.create({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
     paddingHorizontal: 40,
   },
   card: {
-    width: '100%',
+    width: "100%",
     maxWidth: 320,
     backgroundColor: white,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   textBox: {
     paddingHorizontal: 20,
-    paddingVertical: 24,
-    gap: 8,
+    paddingVertical: 4,
   },
   title: {
-    textAlign: 'center',
+    textAlign: "center",
     fontFamily: FontFamily.pretendardSemiBold,
     fontSize: 15,
     color: darkGray,
   },
   message: {
-    textAlign: 'center',
+    textAlign: "center",
     fontFamily: FontFamily.pretendardRegular,
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 16,
     color: gray,
   },
   divider: {
@@ -276,14 +329,14 @@ const styles = StyleSheet.create({
     backgroundColor: lightGray,
   },
   buttonRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
+    flexDirection: "row",
+    alignItems: "stretch",
   },
   button: {
     flex: 1,
     height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   buttonPressed: {
     opacity: 0.6,
