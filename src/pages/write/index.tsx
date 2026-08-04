@@ -139,9 +139,6 @@ export default function WritePage() {
 
     setIsWhaleLoading(true);
     setWhaleError(null);
-    // 서버 처리 시간(main.py 로그)과 이 값의 차이가 곧 클라이언트~서버 사이
-    // 네트워크/프록시 구간(Cloudflare Worker, ECS Express 게이트웨이 등) 비용이다.
-    const start = Date.now();
     try {
       const whale = await fetchWhaleMessage({
         diary: draft.original,
@@ -150,9 +147,7 @@ export default function WritePage() {
       });
       setWhaleMessage(whale);
       suggestionHistoryRef.current.push({ whaleMessage: whale, retryCount: nextRetryCount });
-      console.log(`[ai] AI 버튼→화면 표시까지 ${Date.now() - start}ms (retryCount=${nextRetryCount})`);
     } catch (error) {
-      console.log(`[ai] AI 버튼→실패까지 ${Date.now() - start}ms (retryCount=${nextRetryCount})`);
       setWhaleError(error instanceof Error ? error.message : '한마디를 받아오지 못했어요.');
     } finally {
       setIsWhaleLoading(false);

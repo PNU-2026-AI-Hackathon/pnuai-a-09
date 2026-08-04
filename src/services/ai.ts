@@ -79,37 +79,6 @@ async function getAccessToken(): Promise<string> {
   return data.session.access_token;
 }
 
-/**
- * 서버가 내려준 Server-Timing 헤더를 구간별 ms 로 푼다.
- *
- * 예: "total;dur=11500, auth;dur=120, handler;dur=11000"
- *
- * 클라에서 재는 fetch 시간에는 네트워크와 서버 처리가 섞여 있어서 어느 쪽이
- * 느린지 알 수 없다. 서버가 자기 처리 시간을 알려주면 나머지가 곧 네트워크다.
- */
-function parseServerTiming(header: string | null): Record<string, number> {
-  if (!header) {
-    return {};
-  }
-
-  const result: Record<string, number> = {};
-  for (const entry of header.split(",")) {
-    const [rawName, ...params] = entry.trim().split(";");
-    const name = rawName?.trim();
-    if (!name) {
-      continue;
-    }
-    for (const param of params) {
-      const matched = param.trim().match(/^dur=(-?[\d.]+)$/);
-      if (matched) {
-        result[name] = Number(matched[1]);
-        break;
-      }
-    }
-  }
-  return result;
-}
-
 async function requestAI<T>(
   path: string,
   body: Record<string, unknown>,
@@ -119,14 +88,11 @@ async function requestAI<T>(
     throw new Error("EXPO_PUBLIC_AI_API_URL 환경 변수를 확인해주세요.");
   }
 
-  const tokenStart = Date.now();
   const token = await getAccessToken();
-  const tokenElapsed = Date.now() - tokenStart;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  const fetchStart = Date.now();
   let response: Response;
   try {
     response = await fetch(`${AI_API_URL}${path}`, {
@@ -139,10 +105,6 @@ async function requestAI<T>(
       signal: controller.signal,
     });
   } catch (error) {
-    const fetchElapsed = Date.now() - fetchStart;
-    console.log(
-      `[ai] ${method} ${path} 토큰 ${tokenElapsed}ms + 요청 실패까지 ${fetchElapsed}ms`,
-    );
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error("응답이 너무 늦어요. 잠시 후 다시 시도해 주세요.");
     }
@@ -150,18 +112,6 @@ async function requestAI<T>(
   } finally {
     clearTimeout(timer);
   }
-  const fetchElapsed = Date.now() - fetchStart;
-  const timing = parseServerTiming(response.headers.get("Server-Timing"));
-  const breakdown =
-    timing.total === undefined
-      ? " (Server-Timing 없음 — 구버전 서버)"
-      : ` → 서버 ${Math.round(timing.total)}ms` +
-        ` (인증 ${timing.auth === undefined ? "-" : `${Math.round(timing.auth)}ms`},` +
-        ` 핸들러 ${timing.handler === undefined ? "-" : `${Math.round(timing.handler)}ms`})` +
-        ` + 네트워크 ${Math.round(fetchElapsed - timing.total)}ms`;
-  console.log(
-    `[ai] ${method} ${path} 토큰 ${tokenElapsed}ms + 요청(네트워크+서버) ${fetchElapsed}ms = 총 ${tokenElapsed + fetchElapsed}ms${breakdown}`,
-  );
 
   if (!response.ok) {
     if (response.status === 401) {

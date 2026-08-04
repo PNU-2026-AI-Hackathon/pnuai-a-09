@@ -574,6 +574,7 @@ export default function FriendProfilePage() {
           accessibilityRole="button"
           accessibilityLabel="설정"
           hitSlop={10}
+          onPress={() => router.push("/(tabs)/profile/settings")}
           style={({ pressed }) => [
             styles.topBarButton,
             pressed && styles.pressed,
