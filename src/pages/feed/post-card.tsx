@@ -28,6 +28,8 @@ import { blockUser } from '@/src/services/blocks';
 import { createComment, deletePost, toggleCommentLike, togglePostLike } from '@/src/services/posts';
 import { createReport } from '@/src/services/reports';
 
+const cryingWhaleImage = require('../../../assets/icons/crying_whale.png');
+
 type Props = {
   post: FeedPost;
   /** 삭제가 끝났을 때. 목록을 들고 있는 화면이 직접 정리하고 싶을 때 쓴다 */
@@ -768,9 +770,10 @@ export function FeedPostCard({ post, onDeleted }: Props) {
 
       <ConfirmModal
         visible={isBlockConfirmOpen}
-        title={`${post.username}님을 차단할까요?`}
-        message="친구 관계가 해제되고 서로의 게시글이 보이지 않게 돼요. 설정에서 다시 해제할 수 있어요."
+        title={`${post.username}님을 정말 차단하시겠습니까?`}
+        message="차단 후에는 친구 관계가 해제되고 서로의 게시글을 볼 수 없어요."
         confirmLabel="차단"
+        image={cryingWhaleImage}
         destructive
         isPending={isBlocking}
         onConfirm={handleBlock}

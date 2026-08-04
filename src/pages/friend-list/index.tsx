@@ -29,6 +29,8 @@ import {
 } from '@/src/services/friends';
 import type { AppUser } from '@/src/services/users';
 
+const cryingWhaleImage = require('../../../assets/icons/crying_whale.png');
+
 type RowMenu = { userId: string; top: number; right: number };
 type ConfirmTarget = { userId: string; action: 'block' | 'report' };
 
@@ -354,9 +356,10 @@ export default function FriendListPage() {
 
       <ConfirmModal
         visible={confirmTarget?.action === 'block'}
-        title={`${confirmTargetName}님을 차단할까요?`}
-        message="친구 관계가 해제되고 서로의 게시글이 보이지 않게 돼요. 설정에서 다시 해제할 수 있어요."
+        title={`${confirmTargetName}님을 정말 차단하시겠습니까?`}
+        message="차단 후에는 친구 관계가 해제되고 서로의 게시글을 볼 수 없어요."
         confirmLabel="차단"
+        image={cryingWhaleImage}
         destructive
         isPending={isConfirmPending}
         onConfirm={() => confirmTarget && confirmBlock(confirmTarget.userId)}

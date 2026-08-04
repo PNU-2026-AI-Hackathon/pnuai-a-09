@@ -71,6 +71,10 @@ export default function WritePage() {
   const [whaleError, setWhaleError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
+  // 이 draft 안에서 지금까지 받은 한마디 전부(성공한 것만). 마지막 항목이 곧
+  // 현재 whaleMessage와 같다 — "적용하기" 시점에 마지막을 뺀 나머지가 거절된 제안들이다.
+  const suggestionHistoryRef = useRef<{ whaleMessage: string; retryCount: number }[]>([]);
+
   // "적용하기"를 누른 draftId. 등록이 성공하면 이 draft 행에 최종 텍스트를 채운다.
   // 세션 중 AI 버튼을 여러 번 눌러도 마지막으로 적용된 draft만 최종본과 연결한다.
   const appliedDraftIdRef = useRef<string | null>(null);
@@ -80,6 +84,7 @@ export default function WritePage() {
     setImages([]);
     setEditingPost(null);
     draftRef.current = null;
+    suggestionHistoryRef.current = [];
     appliedDraftIdRef.current = null;
     setWhaleMessage('');
     setWhaleError(null);
@@ -134,6 +139,9 @@ export default function WritePage() {
 
     setIsWhaleLoading(true);
     setWhaleError(null);
+    // 서버 처리 시간(main.py 로그)과 이 값의 차이가 곧 클라이언트~서버 사이
+    // 네트워크/프록시 구간(Cloudflare Worker, ECS Express 게이트웨이 등) 비용이다.
+    const start = Date.now();
     try {
       const whale = await fetchWhaleMessage({
         diary: draft.original,
@@ -141,7 +149,10 @@ export default function WritePage() {
         retryCount: nextRetryCount,
       });
       setWhaleMessage(whale);
+      suggestionHistoryRef.current.push({ whaleMessage: whale, retryCount: nextRetryCount });
+      console.log(`[ai] AI 버튼→화면 표시까지 ${Date.now() - start}ms (retryCount=${nextRetryCount})`);
     } catch (error) {
+      console.log(`[ai] AI 버튼→실패까지 ${Date.now() - start}ms (retryCount=${nextRetryCount})`);
       setWhaleError(error instanceof Error ? error.message : '한마디를 받아오지 못했어요.');
     } finally {
       setIsWhaleLoading(false);
@@ -157,6 +168,7 @@ export default function WritePage() {
     }
 
     draftRef.current = { original: text, draftId: createDraftId() };
+    suggestionHistoryRef.current = [];
     setWhaleMessage('');
     setRetryCount(0);
     setIsSheetVisible(true);
@@ -228,11 +240,14 @@ export default function WritePage() {
     const draft = draftRef.current;
     if (draft) {
       appliedDraftIdRef.current = draft.draftId;
+      // 마지막 항목이 곧 지금 적용하는 whaleMessage이므로, 그 앞의 것들만 "거절된 제안"이다.
+      const rejectedMessages = suggestionHistoryRef.current.slice(0, -1);
       saveWhaleMemory({
         originalText: draft.original,
         draftId: draft.draftId,
         whaleMessage,
         retryCount,
+        rejectedMessages,
       }).catch((error) => {
         console.warn('[ai] 장기기억 저장 실패', error);
       });
