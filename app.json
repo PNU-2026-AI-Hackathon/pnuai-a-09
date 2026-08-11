@@ -19,6 +19,7 @@
     "android": {
       "package": "com.whaledone.myapp",
       "versionCode": 2,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/icons/whale1.png",
@@ -87,7 +88,13 @@
         }
       ],
       "expo-apple-authentication",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#3A8DFF"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

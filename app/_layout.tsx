@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { supabase } from '@/src/lib/supabase';
 
 SplashScreen.preventAutoHideAsync();
@@ -46,6 +47,8 @@ export default function RootLayout() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  usePushNotifications();
 
   if (!loaded && !fontError) {
     return null;

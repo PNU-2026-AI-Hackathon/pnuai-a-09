@@ -10,7 +10,9 @@ import Svg, { Path } from 'react-native-svg';
 
 import { PencilIcon } from '@/components/icons/pencil-icon';
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
+import { NotificationBellIcon } from '@/components/notification-bell-icon';
 import { background, darkGray, FontFamily, gray, lightGray, primary, white } from '@/constants/theme';
+import { useUnseenNotifications } from '@/hooks/use-unseen-notifications';
 import { fetchAcceptedFriendIds } from '@/src/services/friends';
 import { signOutUser } from '@/src/services/onboarding';
 import { AppUser, fetchCurrentUser, saveCoverImage } from '@/src/services/users';
@@ -115,6 +117,7 @@ function StatCard({
 
 export default function ProfilePage() {
   const router = useRouter();
+  const hasUnseen = useUnseenNotifications();
   const insets = useSafeAreaInsets();
   const [currentUser, setCurrentUser] = useState<AppUser>(emptyProfile);
   const [friendsCount, setFriendsCount] = useState<number | null>(null);
@@ -354,7 +357,7 @@ export default function ProfilePage() {
           accessibilityLabel="알림"
           onPress={() => router.push('/(tabs)/profile/notifications')}
           style={({ pressed }) => [styles.iconHit, pressed && styles.iconPressed]}>
-          <Ionicons name="notifications-outline" size={22} color={darkGray} />
+          <NotificationBellIcon hasUnseen={hasUnseen} color={darkGray} />
         </Pressable>
         <Pressable
           accessibilityRole="button"
