@@ -288,7 +288,10 @@ export default function WritePage() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        // Android는 시스템의 adjustResize와 탭바 숨김이 이미 화면 높이를 조정한다.
+        // 여기서 `height`까지 사용하면 키보드가 닫힐 때 높이가 이중으로 계산되어
+        // bottomBar가 다시 나타난 탭바 뒤로 들어갈 수 있다.
+        behavior={Platform.OS === 'android' ? 'padding' : undefined}>
         <ThemedView style={styles.container}>
           {/* Topbar */}
           <View style={styles.topBar}>
