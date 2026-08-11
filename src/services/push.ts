@@ -90,8 +90,12 @@ async function ensurePermission(): Promise<boolean> {
  * 막힌다. 결과는 boolean 으로만 돌려준다.
  */
 export async function registerPushToken(): Promise<boolean> {
-  if (!Device.isDevice) {
-    console.log('[push] 시뮬레이터에서는 푸시 토큰을 받을 수 없습니다.');
+  // iOS 시뮬레이터는 APNs 토큰을 발급받을 수 없어서 시도 자체가 무의미하다.
+  // Android 에뮬레이터는 다르다 — Play 서비스가 포함된 시스템 이미지라면 FCM
+  // 토큰이 정상적으로 나오므로 막지 않는다. Play 서비스가 없는 이미지면 아래
+  // getExpoPushTokenAsync 가 던지고 catch 에서 걸린다.
+  if (!Device.isDevice && Platform.OS === 'ios') {
+    console.log('[push] iOS 시뮬레이터에서는 푸시 토큰을 받을 수 없습니다.');
     return false;
   }
 
@@ -138,7 +142,7 @@ export async function registerPushToken(): Promise<boolean> {
  * 세션이 끊기기 전에 불러야 한다 — RLS가 auth.uid() 로 본인 행인지 판단한다.
  */
 export async function unregisterPushToken(): Promise<void> {
-  if (!Device.isDevice) {
+  if (!Device.isDevice && Platform.OS === 'ios') {
     return;
   }
 
