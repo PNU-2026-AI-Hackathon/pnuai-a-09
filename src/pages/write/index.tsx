@@ -6,7 +6,6 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   TextInput,
@@ -16,11 +15,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AIBottomSheet } from '@/components/ai-bottom-sheet';
 import { CustomImagePicker } from '@/components/custom-image-picker';
-import { ImageGrid } from '@/components/image-grid';
-import { PostSettingsBottomSheet } from '@/components/post-settings-bottom-sheet';
 import AIIcon from '@/components/icons/ai-icon';
 import UnorderedListIcon from '@/components/icons/unordered-list-icon';
 import UploadIcon from '@/components/icons/upload-icon';
+import { ImageGrid } from '@/components/image-grid';
+import { PostSettingsBottomSheet } from '@/components/post-settings-bottom-sheet';
 import { ThemedButton } from '@/components/themed-button';
 import { ThemedView } from '@/components/themed-view';
 import {
@@ -288,10 +287,9 @@ export default function WritePage() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        // Android는 시스템의 adjustResize와 탭바 숨김이 이미 화면 높이를 조정한다.
-        // 여기서 `height`까지 사용하면 키보드가 닫힐 때 높이가 이중으로 계산되어
-        // bottomBar가 다시 나타난 탭바 뒤로 들어갈 수 있다.
-        behavior={Platform.OS === 'android' ? 'padding' : undefined}>
+        // 두 플랫폼 모두 하단 여백으로 키보드를 피한다. `height`처럼 화면 자체를
+        // 줄이지 않아, 키보드와 함께 숨었던 탭바가 돌아올 때 bottomBar가 겹치지 않는다.
+        behavior="padding">
         <ThemedView style={styles.container}>
           {/* Topbar */}
           <View style={styles.topBar}>
