@@ -1,5 +1,5 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -65,6 +65,34 @@ export default function FeedPage() {
     };
   }, [feedUserIds, isLoading, refreshKey]);
 
+  // 알림에서 넘어온 경우 그 글로 스크롤한다.
+  //
+  // 파라미터는 스크롤한 뒤 지운다. 안 지우면 탭을 옮겼다 돌아올 때마다 같은 글로
+  // 다시 튀고, 같은 알림을 두 번 눌렀을 때는 값이 그대로라 아무 일도 안 일어난다.
+  const { postId } = useLocalSearchParams<{ postId?: string }>();
+  const listRef = useRef<FlatList<FeedPost>>(null);
+
+  useEffect(() => {
+    if (!postId || feedPosts.length === 0) {
+      return;
+    }
+
+    const index = feedPosts.findIndex((post) => post.id === postId);
+    if (index < 0) {
+      // 친구를 끊었거나 글이 지워지면 피드에 없다. 목록 맨 위에 그대로 둔다.
+      router.setParams({ postId: '' });
+      return;
+    }
+
+    // 목록이 그려진 다음 프레임에 움직여야 위치 계산이 맞는다.
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+      router.setParams({ postId: '' });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [postId, feedPosts, router]);
+
   const renderItem: ListRenderItem<FeedPost> = ({ item }) => <FeedPostCard post={item} />;
 
   const fabBottom = TAB_BAR_VISUAL_HEIGHT + insets.bottom + FAB_GAP_ABOVE_TAB;
@@ -75,11 +103,21 @@ export default function FeedPage() {
       <HomeHeader active="feed" />
       <View style={styles.screen}>
         <FlatList
+          ref={listRef}
           data={feedPosts}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={[styles.listContent, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
+          // 카드 높이가 글 길이·이미지 수에 따라 제각각이라 getItemLayout 을 줄 수 없고,
+          // 아직 그려지지 않은 항목으로는 곧장 뛰지 못해 여기로 떨어진다. 평균 높이로
+          // 어림잡아 옮겨서 대상 항목을 렌더시킨 뒤 한 번만 다시 시도한다.
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            listRef.current?.scrollToOffset({ offset: index * averageItemLength, animated: false });
+            requestAnimationFrame(() => {
+              listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+            });
+          }}
         />
         <Pressable
           style={[styles.fab, { bottom: fabBottom }]}

@@ -42,14 +42,23 @@ const SETTING_COLUMN: Record<NotificationType, string> = {
   friend_request: 'friend_request_enabled',
 };
 
+// 알림 배너는 두어 줄만 보인다. 긴 댓글을 통째로 실으면 뒷부분은 어차피 잘리고
+// 페이로드만 커진다. 줄바꿈도 한 줄로 눌러야 배너가 이상하게 벌어지지 않는다.
+const COMMENT_PREVIEW_LIMIT = 50;
+
+function preview(comment: string): string {
+  const flat = comment.replace(/\s+/g, ' ').trim();
+  return flat.length <= COMMENT_PREVIEW_LIMIT ? flat : `${flat.slice(0, COMMENT_PREVIEW_LIMIT)}…`;
+}
+
 function buildBody(type: NotificationType, actorName: string, comment: string | null): string {
   switch (type) {
     case 'like':
       return `${actorName}님이 회원님의 글을 좋아해요.`;
     case 'comment':
-      return comment ? `${actorName}님의 댓글: ${comment}` : `${actorName}님이 댓글을 남겼어요.`;
+      return comment ? `${actorName}님의 댓글: ${preview(comment)}` : `${actorName}님이 댓글을 남겼어요.`;
     case 'reply':
-      return comment ? `${actorName}님의 답글: ${comment}` : `${actorName}님이 답글을 남겼어요.`;
+      return comment ? `${actorName}님의 답글: ${preview(comment)}` : `${actorName}님이 답글을 남겼어요.`;
     case 'new_post':
       return `${actorName}님이 새 글을 올렸어요.`;
     case 'friend_request':
