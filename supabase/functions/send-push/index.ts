@@ -19,10 +19,12 @@ const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 // Expo는 한 요청에 100건까지 받는다.
 const EXPO_BATCH_SIZE = 100;
 
-type NotificationType = 'like' | 'comment' | 'reply' | 'new_post';
+type NotificationType = 'like' | 'comment' | 'reply' | 'new_post' | 'friend_request';
 
 type NotificationRecord = {
-  id: string;
+  // friend_request 는 notifications 테이블을 거치지 않고 트리거가 직접 만들어 보내서
+  // 행 id 가 없다. 알림 탭 이후 화면 이동에만 쓰는 값이라 없어도 동작한다.
+  id?: string;
   type: NotificationType;
   actor_user_id: string;
   recipient_user_id: string;
@@ -37,6 +39,7 @@ const SETTING_COLUMN: Record<NotificationType, string> = {
   // 답글도 사용자에겐 댓글이다. 토글을 따로 두지 않았으므로 같은 스위치를 본다.
   reply: 'comment_enabled',
   new_post: 'friend_post_enabled',
+  friend_request: 'friend_request_enabled',
 };
 
 function buildBody(type: NotificationType, actorName: string, comment: string | null): string {
@@ -49,6 +52,8 @@ function buildBody(type: NotificationType, actorName: string, comment: string | 
       return comment ? `${actorName}님의 답글: ${comment}` : `${actorName}님이 답글을 남겼어요.`;
     case 'new_post':
       return `${actorName}님이 새 글을 올렸어요.`;
+    case 'friend_request':
+      return `${actorName}님이 친구 요청을 보냈어요.`;
   }
 }
 
