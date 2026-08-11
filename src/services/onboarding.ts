@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 
 import { supabase } from '@/src/lib/supabase';
+import { unregisterPushToken } from '@/src/services/push';
 
 type ProfileOnboardingRow = {
   id: string;
@@ -453,6 +454,10 @@ export async function signInAsTestUser(): Promise<User> {
 }
 
 export async function signOutUser(): Promise<void> {
+  // 세션이 살아 있을 때 지워야 한다. signOut 이후에는 RLS가 auth.uid() 를 못 찾아
+  // 삭제가 조용히 실패하고, 로그아웃한 계정의 알림이 이 기기로 계속 온다.
+  await unregisterPushToken();
+
   const { error } = await supabase.auth.signOut();
 
   if (error) {
