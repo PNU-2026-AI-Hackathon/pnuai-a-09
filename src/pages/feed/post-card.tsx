@@ -765,7 +765,8 @@ export function FeedPostCard({ post, onDeleted }: Props) {
         onRequestClose={closeComments}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
           style={styles.sheetOverlay}
         >
           <Animated.View
@@ -805,6 +806,7 @@ export function FeedPostCard({ post, onDeleted }: Props) {
             <ScrollView
               style={styles.sheetList}
               contentContainerStyle={styles.sheetListContent}
+              keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
               {localComments.map((comment) => (
