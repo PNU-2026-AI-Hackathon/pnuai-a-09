@@ -29,6 +29,8 @@ import { signOutUser } from "@/src/services/onboarding";
 import type { TermType } from "@/src/services/terms";
 import { fetchCurrentUser, type AppUser } from "@/src/services/users";
 
+const cryingWhaleImage = require("../../../assets/icons/crying_whale.png");
+
 type SettingRow = {
   icon: SettingIconName;
   label: string;
@@ -93,7 +95,10 @@ const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 export default function SettingsPage() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  /** 열려 있는 확인 모달. 둘이 동시에 뜰 일은 없어서 한 상태로 둔다 */
+  const [confirmAction, setConfirmAction] = useState<
+    "logout" | "withdraw" | null
+  >(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
@@ -133,11 +138,11 @@ export default function SettingsPage() {
 
     try {
       await signOutUser();
-      setIsLogoutConfirmOpen(false);
+      setConfirmAction(null);
       router.replace("/");
     } catch (error) {
       console.warn("[settings] Failed to sign out", error);
-      setIsLogoutConfirmOpen(false);
+      setConfirmAction(null);
       Alert.alert("로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setIsSigningOut(false);
@@ -232,7 +237,7 @@ export default function SettingsPage() {
             accessibilityRole="button"
             accessibilityLabel="로그아웃"
             disabled={isSigningOut}
-            onPress={() => setIsLogoutConfirmOpen(true)}
+            onPress={() => setConfirmAction("logout")}
             style={({ pressed }) => [
               styles.plainRow,
               pressed && styles.pressed,
@@ -243,7 +248,7 @@ export default function SettingsPage() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="회원탈퇴"
-            onPress={() => showComingSoon("회원탈퇴")}
+            onPress={() => setConfirmAction("withdraw")}
             style={({ pressed }) => [
               styles.plainRow,
               pressed && styles.pressed,
@@ -255,16 +260,32 @@ export default function SettingsPage() {
       </ScrollView>
 
       <ConfirmModal
-        visible={isLogoutConfirmOpen}
-        title="로그아웃할까요?"
+        visible={confirmAction === "logout"}
+        title="정말 로그아웃하시겠습니까?"
         message="다시 로그인하면 그대로 이어서 쓸 수 있어요."
         confirmLabel="로그아웃"
+        image={cryingWhaleImage}
         destructive
         isPending={isSigningOut}
         onConfirm={() => {
           void handleLogout();
         }}
-        onCancel={() => setIsLogoutConfirmOpen(false)}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      {/* 탈퇴 처리 API가 아직 없어서 확인까지만 받고 안내를 띄운다 */}
+      <ConfirmModal
+        visible={confirmAction === "withdraw"}
+        title="정말 탈퇴하시겠습니까?"
+        message="탈퇴하면 작성한 글과 친구 관계가 모두 사라지고 되돌릴 수 없어요."
+        confirmLabel="탈퇴"
+        image={cryingWhaleImage}
+        destructive
+        onConfirm={() => {
+          setConfirmAction(null);
+          showComingSoon("회원탈퇴");
+        }}
+        onCancel={() => setConfirmAction(null)}
       />
     </SafeAreaView>
   );
