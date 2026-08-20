@@ -31,7 +31,13 @@ import {
   primary,
   white,
 } from '@/constants/theme';
-import { createDraftId, fetchWhaleMessage, finalizeWhaleMemory, saveWhaleMemory } from '@/src/services/ai';
+import {
+  createDraftId,
+  fetchWhaleMessage,
+  finalizeWhaleMemory,
+  saveWhaleMemory,
+  type CrisisResource,
+} from '@/src/services/ai';
 import { submitAIFeedback } from '@/src/services/ai-feedback';
 import { createPost, fetchPostForEdit, updatePost, type EditablePost } from '@/src/services/posts';
 import type { PostVisibility } from '@/src/types/api/feed-post';
@@ -69,6 +75,9 @@ export default function WritePage() {
   const [whaleMessage, setWhaleMessage] = useState('');
   const [isWhaleLoading, setIsWhaleLoading] = useState(false);
   const [whaleError, setWhaleError] = useState<string | null>(null);
+  // 서버(safety 블록)가 위험 신호를 붙여 보낸 한마디인지. 시트에 상담 전화 안내를 띄운다.
+  const [isWhaleRisky, setIsWhaleRisky] = useState(false);
+  const [crisisResources, setCrisisResources] = useState<CrisisResource[]>([]);
   const [retryCount, setRetryCount] = useState(0);
 
   // 이 draft 안에서 지금까지 받은 한마디 전부(성공한 것만). 마지막 항목이 곧
@@ -88,6 +97,8 @@ export default function WritePage() {
     appliedDraftIdRef.current = null;
     setWhaleMessage('');
     setWhaleError(null);
+    setIsWhaleRisky(false);
+    setCrisisResources([]);
     setRetryCount(0);
   }, []);
 
@@ -145,8 +156,10 @@ export default function WritePage() {
         draftId: draft.draftId,
         retryCount: nextRetryCount,
       });
-      setWhaleMessage(whale);
-      suggestionHistoryRef.current.push({ whaleMessage: whale, retryCount: nextRetryCount });
+      setWhaleMessage(whale.message);
+      setIsWhaleRisky(whale.isRisky);
+      setCrisisResources(whale.resources);
+      suggestionHistoryRef.current.push({ whaleMessage: whale.message, retryCount: nextRetryCount });
     } catch (error) {
       setWhaleError(error instanceof Error ? error.message : '한마디를 받아오지 못했어요.');
     } finally {
@@ -165,6 +178,8 @@ export default function WritePage() {
     draftRef.current = { original: text, draftId: createDraftId() };
     suggestionHistoryRef.current = [];
     setWhaleMessage('');
+    setIsWhaleRisky(false);
+    setCrisisResources([]);
     setRetryCount(0);
     setIsSheetVisible(true);
     void requestWhaleMessage(0);
@@ -411,6 +426,8 @@ export default function WritePage() {
         aiResponse={whaleMessage}
         isLoading={isWhaleLoading}
         errorMessage={whaleError}
+        isRisky={isWhaleRisky}
+        crisisResources={crisisResources}
         onClose={() => setIsSheetVisible(false)}
         onRefresh={handleRefresh}
         onApply={handleApply}

@@ -2,7 +2,7 @@
   "expo": {
     "name": "whale-app",
     "slug": "whale-app",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icons/whale1.png",
     "scheme": "whaleapp",

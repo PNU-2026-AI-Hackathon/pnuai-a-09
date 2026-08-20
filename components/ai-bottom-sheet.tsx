@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Image,
   Keyboard,
+  Linking,
   Modal,
   Pressable,
   StyleSheet,
@@ -14,6 +16,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { CrisisResource } from '@/src/services/ai';
 import {
   background,
   darkGray,
@@ -21,6 +24,7 @@ import {
   gray,
   lightGray,
   primary,
+  red,
   white,
 } from '@/constants/theme';
 
@@ -35,6 +39,10 @@ type Props = {
   isLoading?: boolean;
   /** 실패했을 때 말풍선에 대신 띄울 문구 */
   errorMessage?: string | null;
+  /** 서버(safety.is_risky)가 위험 신호를 감지한 글이면 상담 전화 안내를 띄운다 */
+  isRisky?: boolean;
+  /** 서버가 내려준 상담 기관. 비어 있으면 앱이 가진 기본 번호를 쓴다 */
+  crisisResources?: CrisisResource[];
   /** 평가 저장 API를 연결할 때 사용한다. */
   onFeedbackSubmit?: (feedback: FeedbackPayload) => void | Promise<void>;
 };
@@ -49,6 +57,19 @@ export type FeedbackPayload = {
 };
 
 const aiPrimary = '#69C5F1';
+
+/**
+ * 서버가 상담 기관을 안 내려줬을 때 쓰는 기본값.
+ * 자살예방 상담전화는 2024년부터 109 로 통합됐고 24시간 무료다.
+ */
+const FALLBACK_RESOURCE: CrisisResource = {
+  label: '자살예방 상담전화 109',
+  phone: '109',
+  url: null,
+};
+
+/** 안내가 너무 길어지지 않게 보여 줄 기관 수를 제한한다. */
+const MAX_CRISIS_RESOURCES = 3;
 const positiveReasons = ['듣고 싶던 말', '생각의 변화', '위안이 됨', '다정한 어조', '기타'];
 const negativeReasons = ['한국어 서툶', '엉뚱한 답변', '상투적임', '사실이 아님', '불쾌함', '기타'];
 const feedbackDisclaimer =
@@ -64,6 +85,8 @@ export function AIBottomSheet({
   onFeedbackSubmit,
   isLoading = false,
   errorMessage = null,
+  isRisky = false,
+  crisisResources = [],
 }: Props) {
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(700)).current;
@@ -385,6 +408,9 @@ export function AIBottomSheet({
             <View style={styles.actionDivider} />
           </View>
 
+                {/* 위험 신호가 잡힌 글이면 상담 전화를 안내한다 */}
+                {isRisky ? <CrisisNotice resources={crisisResources} /> : null}
+
                 {/* 작성 내용 (수정 가능, 적용하기 누를 때만 반영) */}
                 <TextInput
                   style={styles.contentInput}
@@ -494,6 +520,59 @@ export function AIBottomSheet({
   );
 }
 
+/**
+ * 위험 신호가 감지됐을 때 말풍선 아래에 붙는 안내.
+ *
+ * 앱이 할 수 있는 건 사람에게 연결해 주는 것까지다. 누르면 바로 전화가 걸리도록
+ * tel: 링크를 연다 — 위급할 때 번호를 받아 적게 하면 안 된다.
+ */
+function CrisisNotice({ resources }: { resources: CrisisResource[] }) {
+  const list = (resources.length > 0 ? resources : [FALLBACK_RESOURCE]).slice(0, MAX_CRISIS_RESOURCES);
+
+  const open = async (resource: CrisisResource) => {
+    // 전화가 먼저다. 번호가 없는 기관은 안내 페이지라도 열어 준다.
+    const url = resource.phone ? `tel:${resource.phone}` : resource.url;
+    if (!url) {
+      return;
+    }
+
+    try {
+      await Linking.openURL(url);
+    } catch {
+      // 전화 앱이 없는 기기(태블릿·시뮬레이터)에서도 번호는 알 수 있어야 한다.
+      Alert.alert(
+        '연결할 수 없어요',
+        resource.phone ? `${resource.label} ${resource.phone} 로 연락해 주세요.` : resource.label,
+      );
+    }
+  };
+
+  return (
+    <View style={styles.crisisBox}>
+      <Text style={styles.crisisTitle}>혼자 견디지 않으셨으면 해요</Text>
+      <Text style={styles.crisisBody}>
+        지금 많이 힘드신 것 같아요. 24시간 이야기를 들어 주는 곳이 있어요.
+      </Text>
+      {list.map((resource) => (
+        <Pressable
+          key={`${resource.label}-${resource.phone ?? resource.url}`}
+          accessibilityRole="button"
+          accessibilityLabel={
+            resource.phone ? `${resource.label} 전화 걸기` : `${resource.label} 열기`
+          }
+          onPress={() => {
+            void open(resource);
+          }}
+          style={({ pressed }) => [styles.crisisButton, pressed && styles.dimmed]}>
+          <Text style={styles.crisisButtonText}>
+            {resource.phone ? `${resource.label} ${resource.phone}` : resource.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 function BackArrowIcon() {
   return (
     <Svg width={16} height={12} viewBox="0 0 16 12" fill="none">
@@ -531,6 +610,38 @@ function ThumbIcon({ direction }: { direction: 'up' | 'down' }) {
 }
 
 const styles = StyleSheet.create({
+  crisisBox: {
+    borderRadius: 12,
+    backgroundColor: '#FFF1F1',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  crisisTitle: {
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 14,
+    lineHeight: 19,
+    color: darkGray,
+  },
+  crisisBody: {
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 12,
+    lineHeight: 17,
+    color: gray,
+  },
+  crisisButton: {
+    marginTop: 4,
+    height: 42,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: red,
+  },
+  crisisButtonText: {
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 14,
+    color: white,
+  },
   overlay: {
     flex: 1,
   },
