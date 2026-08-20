@@ -1,6 +1,11 @@
 import type { ImageSourcePropType } from 'react-native';
 
 import { supabase } from '@/src/lib/supabase';
+import {
+  fetchNotificationSettings,
+  type NotificationSettingKey,
+  type NotificationSettings,
+} from '@/src/services/user-settings';
 
 export type NotificationType = 'like' | 'comment' | 'reply' | 'new_post';
 export type NotificationSection = 'today' | 'last_week';
@@ -36,6 +41,33 @@ export type AppNotification = {
   section: NotificationSection;
   isNew?: boolean;
 };
+
+/**
+ * 알림 종류별로 볼 설정 토글. 푸시(send-push Edge Function)와 같은 규칙이다 —
+ * 답글은 따로 토글이 없어서 댓글 스위치를 같이 쓴다.
+ */
+const SETTING_KEY_BY_TYPE: Record<NotificationType, NotificationSettingKey> = {
+  like: 'likeEnabled',
+  comment: 'commentEnabled',
+  reply: 'commentEnabled',
+  new_post: 'friendPostEnabled',
+};
+
+/**
+ * 지금 받기로 한 알림 종류.
+ *
+ * 알림 행 자체는 설정과 무관하게 쌓인다(트리거가 만든다). 껐던 기간의 기록을 지우지
+ * 않고 화면에서만 걸러야, 다시 켰을 때 그동안의 알림을 볼 수 있다.
+ */
+function getEnabledTypes(settings: NotificationSettings): NotificationType[] {
+  if (!settings.allEnabled) {
+    return [];
+  }
+
+  return (Object.keys(SETTING_KEY_BY_TYPE) as NotificationType[]).filter(
+    (type) => settings[SETTING_KEY_BY_TYPE[type]],
+  );
+}
 
 function getPublicStorageUrl(bucket: 'profiles' | 'posts', path: string | null) {
   if (!path) {
@@ -98,10 +130,19 @@ function getSection(value: string): NotificationSection {
 }
 
 export async function fetchNotificationsForUserId(recipientId: string): Promise<AppNotification[]> {
+  const settings = await fetchNotificationSettings();
+  const enabledTypes = getEnabledTypes(settings);
+
+  // 전부 껐으면 조회할 것도 없다. .in('type', []) 는 쿼리가 깨지므로 여기서 끊는다.
+  if (enabledTypes.length === 0) {
+    return [];
+  }
+
   const { data: notifications, error: notificationsError } = await supabase
     .from('notifications')
     .select('id, type, actor_user_id, post_id, post_image_url, comment_content, is_read, created_at')
     .eq('recipient_user_id', recipientId)
+    .in('type', enabledTypes)
     .order('created_at', { ascending: false })
     .returns<NotificationRow[]>();
 
@@ -159,14 +200,23 @@ export async function fetchNotificationsForUserId(recipientId: string): Promise<
  * 친구 요청을 같이 세는 이유: 알림 화면이 친구 요청을 목록과 별개로 보여주고 있어서,
  * notifications 만 세면 요청이 와 있는데도 점이 안 찍힌다. 요청은 읽음 상태가 없고
  * 수락·거절해야 사라지므로, 응답할 때까지 점이 남는다(할 일이 남아 있다는 뜻).
+ *
+ * 끈 종류는 목록에 안 보이므로 점도 찍지 않는다. 다만 친구 요청은 알림이 아니라
+ * 처리해야 할 일이라서, 설정과 무관하게 항상 센다 — 감추면 수락할 방법이 없다.
  */
 export async function hasUnseenNotifications(userId: string): Promise<boolean> {
+  const settings = await fetchNotificationSettings();
+  const enabledTypes = getEnabledTypes(settings);
+
   const [unread, requests] = await Promise.all([
-    supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('recipient_user_id', userId)
-      .eq('is_read', false),
+    enabledTypes.length === 0
+      ? Promise.resolve({ count: 0, error: null })
+      : supabase
+          .from('notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('recipient_user_id', userId)
+          .in('type', enabledTypes)
+          .eq('is_read', false),
     supabase
       .from('friend_requests')
       .select('requester_id', { count: 'exact', head: true })
@@ -191,10 +241,20 @@ export async function hasUnseenNotifications(userId: string): Promise<boolean> {
  * 무엇이 새 알림이었는지 알 수 없다. 다음에 들어오면 깨끗해진다.
  */
 export async function markNotificationsRead(userId: string): Promise<void> {
+  const settings = await fetchNotificationSettings();
+  const enabledTypes = getEnabledTypes(settings);
+
+  // 화면에 안 보이는 종류까지 읽음으로 바꾸지 않는다. 나중에 다시 켰을 때
+  // 그동안 온 알림이 NEW 로 보여야 한다.
+  if (enabledTypes.length === 0) {
+    return;
+  }
+
   const { error } = await supabase
     .from('notifications')
     .update({ is_read: true })
     .eq('recipient_user_id', userId)
+    .in('type', enabledTypes)
     .eq('is_read', false);
 
   if (error) {
