@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AIBottomSheet } from '@/components/ai-bottom-sheet';
+import { AIBottomSheet, type FeedbackPayload } from '@/components/ai-bottom-sheet';
 import { CustomImagePicker } from '@/components/custom-image-picker';
 import AIIcon from '@/components/icons/ai-icon';
 import UnorderedListIcon from '@/components/icons/unordered-list-icon';
@@ -32,6 +32,7 @@ import {
   white,
 } from '@/constants/theme';
 import { createDraftId, fetchWhaleMessage, finalizeWhaleMemory, saveWhaleMemory } from '@/src/services/ai';
+import { submitAIFeedback } from '@/src/services/ai-feedback';
 import { createPost, fetchPostForEdit, updatePost, type EditablePost } from '@/src/services/posts';
 import type { PostVisibility } from '@/src/types/api/feed-post';
 
@@ -248,6 +249,27 @@ export default function WritePage() {
     }
   };
 
+  /**
+   * 고래 한마디 평가 제출.
+   *
+   * 시트는 제출 직후 메인 화면으로 돌아간다. 성공했다고 따로 알리지 않고,
+   * 실패했을 때만 알린다 — 안 보내졌는데 보냈다고 믿게 두면 안 된다.
+   */
+  const handleFeedbackSubmit = async (feedback: FeedbackPayload) => {
+    try {
+      await submitAIFeedback({
+        type: feedback.type,
+        reasons: feedback.reasons,
+        comment: feedback.comment,
+        whaleMessage,
+        draftId: draftRef.current?.draftId ?? null,
+        retryCount,
+      });
+    } catch (error) {
+      Alert.alert(error instanceof Error ? error.message : '평가를 보내지 못했습니다.');
+    }
+  };
+
   const handlePickerConfirm = (uris: string[], sourceUris: string[]) => {
     const picked = uris.map((uri, index) => ({ uri, sourceUri: sourceUris[index] ?? uri }));
 
@@ -391,6 +413,7 @@ export default function WritePage() {
         onClose={() => setIsSheetVisible(false)}
         onRefresh={handleRefresh}
         onApply={handleApply}
+        onFeedbackSubmit={handleFeedbackSubmit}
       />
     </SafeAreaView>
   );
