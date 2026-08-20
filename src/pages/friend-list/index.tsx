@@ -35,13 +35,12 @@ import {
   sendFriendRequest,
   type FriendRelationStatus,
 } from "@/src/services/friends";
-import { createReport } from "@/src/services/reports";
 import type { AppUser } from "@/src/services/users";
 
 const cryingWhaleImage = require("../../../assets/icons/crying_whale.png");
 
 type RowMenu = { userId: string; top: number; right: number };
-type ConfirmTarget = { userId: string; action: "block" | "report" };
+type ConfirmTarget = { userId: string; action: "block" };
 
 export default function FriendListPage() {
   const params = useLocalSearchParams<{
@@ -66,10 +65,6 @@ export default function FriendListPage() {
   );
   const [isConfirmPending, setIsConfirmPending] = useState(false);
   const menuButtonRefs = useRef<Record<string, View | null>>({});
-
-  const confirmTargetName =
-    friends.find((friend) => friend.id === confirmTarget?.userId)?.name ??
-    "이 사용자";
 
   const initialCount = params.count ? Number(params.count) : null;
   const count =
@@ -223,9 +218,17 @@ export default function FriendListPage() {
     setConfirmTarget({ userId, action: "block" });
   };
 
+  // 사유 선택은 별도 화면에서 받는다.
   const handleReport = (userId: string) => {
     setMenu(null);
-    setConfirmTarget({ userId, action: "report" });
+    router.push({
+      pathname: "/report",
+      params: {
+        targetType: "user",
+        targetId: userId,
+        targetName: friends.find((friend) => friend.id === userId)?.name ?? "",
+      },
+    });
   };
 
   const confirmBlock = async (userId: string) => {
@@ -242,23 +245,6 @@ export default function FriendListPage() {
       setConfirmTarget(null);
       Alert.alert(
         error instanceof Error ? error.message : "차단하지 못했습니다.",
-      );
-    } finally {
-      setIsConfirmPending(false);
-    }
-  };
-
-  const confirmReport = async (userId: string) => {
-    setIsConfirmPending(true);
-    try {
-      // 신고 사유 선택은 디자인 확정 후 추가한다. 지금은 사유 없이 접수만 한다.
-      await createReport({ targetType: "user", targetId: userId });
-      setConfirmTarget(null);
-      Alert.alert("신고가 접수되었어요.");
-    } catch (error) {
-      setConfirmTarget(null);
-      Alert.alert(
-        error instanceof Error ? error.message : "신고를 접수하지 못했습니다.",
       );
     } finally {
       setIsConfirmPending(false);
@@ -408,17 +394,6 @@ export default function FriendListPage() {
         destructive
         isPending={isConfirmPending}
         onConfirm={() => confirmTarget && confirmBlock(confirmTarget.userId)}
-        onCancel={() => setConfirmTarget(null)}
-      />
-
-      <ConfirmModal
-        visible={confirmTarget?.action === "report"}
-        title={`${confirmTargetName}님을 신고할까요?`}
-        message="신고 내용은 운영팀이 확인해요."
-        confirmLabel="신고"
-        destructive
-        isPending={isConfirmPending}
-        onConfirm={() => confirmTarget && confirmReport(confirmTarget.userId)}
         onCancel={() => setConfirmTarget(null)}
       />
     </View>

@@ -69,7 +69,11 @@ const SUPPORT_ROWS: SettingRow[] = [
     go: () => router.push("/(tabs)/profile/settings/notices"),
   },
   { icon: "ask", label: "문의하기" },
-  { icon: "siren", label: "신고내역" },
+  {
+    icon: "siren",
+    label: "신고내역",
+    go: () => router.push("/(tabs)/profile/settings/reports"),
+  },
 ];
 
 const LEGAL_ROWS: SettingRow[] = [
