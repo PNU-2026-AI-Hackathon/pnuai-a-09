@@ -73,7 +73,7 @@ const MAX_CRISIS_RESOURCES = 3;
 const positiveReasons = ['듣고 싶던 말', '생각의 변화', '위안이 됨', '다정한 어조', '기타'];
 const negativeReasons = ['한국어 서툶', '엉뚱한 답변', '상투적임', '사실이 아님', '불쾌함', '기타'];
 const feedbackDisclaimer =
-  '데이터는 사용자의 계정에서 연결 해제된 후 숙련된 서비스 제공업체에 의해 검토됩니다. 언제든지 Gemini 앱 활동에서 데이터를 삭제할 수 있습니다.';
+  '보내주신 피드백은 AI 모델 개선에 활용됩니다. 감사합니다.';
 
 export function AIBottomSheet({
   visible,
