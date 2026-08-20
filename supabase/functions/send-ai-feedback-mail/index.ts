@@ -4,8 +4,7 @@
  * 호출 경로
  *   ai_feedback INSERT → trigger(notify_ai_feedback_mail) → pg_net → 이 함수 → Resend
  *
- * 트리거에 when 절이 걸려 있어서 붐따와 '코멘트가 달린 따봉'만 여기까지 온다.
- * 따봉까지 전부 보내면 메일함이 막혀서 정작 봐야 할 붐따가 묻힌다.
+ * 따봉·붐따 모두 온다.
  *
  * 배포
  *   supabase secrets set AI_FEEDBACK_HOOK_SECRET=... RESEND_API_KEY=...

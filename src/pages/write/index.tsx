@@ -252,8 +252,8 @@ export default function WritePage() {
   /**
    * 고래 한마디 평가 제출.
    *
-   * 시트는 제출 직후 메인 화면으로 돌아간다. 성공했다고 따로 알리지 않고,
-   * 실패했을 때만 알린다 — 안 보내졌는데 보냈다고 믿게 두면 안 된다.
+   * 시트는 제출을 기다리지 않고 바로 메인 화면으로 돌아간다. 그래서 결과를 알리지
+   * 않으면 보내진 건지 알 수 없다 — 성공·실패 모두 알린다.
    */
   const handleFeedbackSubmit = async (feedback: FeedbackPayload) => {
     try {
@@ -265,6 +265,7 @@ export default function WritePage() {
         draftId: draftRef.current?.draftId ?? null,
         retryCount,
       });
+      Alert.alert('평가를 보냈어요.', '더 좋은 한마디를 만드는 데 쓸게요. 고맙습니다!');
     } catch (error) {
       Alert.alert(error instanceof Error ? error.message : '평가를 보내지 못했습니다.');
     }

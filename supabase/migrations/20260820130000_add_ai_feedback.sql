@@ -44,11 +44,8 @@ create policy ai_feedback_select_own
 
 -- 운영 메일 -------------------------------------------------------------------
 --
--- 평가는 신고·문의보다 훨씬 자주 들어온다. 따봉까지 전부 보내면 메일함이 막혀서
--- 정작 봐야 할 붐따가 묻힌다. 그래서
---   - 붐따(negative) 는 항상
---   - 따봉(positive) 은 코멘트를 남겼을 때만
--- 보낸다. 전부 받고 싶으면 아래 when 절을 지우면 된다.
+-- 따봉이든 붐따든 평가는 전부 보낸다. 나중에 양이 많아져 메일함이 부담되면
+-- 트리거에 when 절을 걸어 붐따만 남기면 된다.
 --
 -- 배포 전에 한 번 실행할 것 (SQL Editor):
 --   select vault.create_secret(
@@ -101,5 +98,4 @@ drop trigger if exists ai_feedback_send_mail on public.ai_feedback;
 create trigger ai_feedback_send_mail
     after insert on public.ai_feedback
     for each row
-    when (new.feedback_type = 'negative' or new.comment is not null)
     execute function public.notify_ai_feedback_mail();
