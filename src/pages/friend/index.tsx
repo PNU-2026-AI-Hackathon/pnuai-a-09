@@ -34,7 +34,6 @@ import {
   fetchUserPostsByCategory,
   type PostSortOrder,
 } from "@/src/services/posts";
-import { createReport } from "@/src/services/reports";
 import {
   fetchUserById,
   saveCoverImage,
@@ -81,7 +80,7 @@ export default function FriendProfilePage() {
     right: number;
   } | null>(null);
   const moreButtonRef = useRef<View | null>(null);
-  const [confirmAction, setConfirmAction] = useState<"block" | "report" | null>(
+  const [confirmAction, setConfirmAction] = useState<"block" | null>(
     null,
   );
   const [isConfirmPending, setIsConfirmPending] = useState(false);
@@ -279,25 +278,21 @@ export default function FriendProfilePage() {
     }
   };
 
-  const handleReport = async () => {
-    if (!params.userId || isConfirmPending) {
+  // 사유 선택은 별도 화면에서 받는다.
+  const handleReport = () => {
+    if (!params.userId) {
       return;
     }
 
-    setIsConfirmPending(true);
-    try {
-      // 신고 사유 선택은 디자인 확정 후 추가한다. 지금은 사유 없이 접수만 한다.
-      await createReport({ targetType: "user", targetId: params.userId });
-      setConfirmAction(null);
-      Alert.alert("신고가 접수되었어요.");
-    } catch (error) {
-      setConfirmAction(null);
-      Alert.alert(
-        error instanceof Error ? error.message : "신고를 접수하지 못했습니다.",
-      );
-    } finally {
-      setIsConfirmPending(false);
-    }
+    setIsMoreMenuOpen(false);
+    router.push({
+      pathname: "/report",
+      params: {
+        targetType: "user",
+        targetId: params.userId,
+        targetName: displayName,
+      },
+    });
   };
 
   const renderItem: ListRenderItem<FeedPost> = ({ item }) => (
@@ -513,10 +508,7 @@ export default function FriendProfilePage() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={() => {
-                setIsMoreMenuOpen(false);
-                setConfirmAction("report");
-              }}
+              onPress={handleReport}
               style={({ pressed }) => [
                 styles.moreMenuItem,
                 pressed && styles.pressed,
@@ -539,18 +531,6 @@ export default function FriendProfilePage() {
         destructive
         isPending={isConfirmPending}
         onConfirm={handleBlock}
-        onCancel={() => setConfirmAction(null)}
-      />
-
-      {/* 신고 사유 선택은 디자인 확정 후 추가한다. 지금은 사유 없이 접수만 한다. */}
-      <ConfirmModal
-        visible={confirmAction === "report"}
-        title={`${displayName || "이 사용자"}님을 신고할까요?`}
-        message="신고 내용은 운영팀이 확인해요."
-        confirmLabel="신고"
-        destructive
-        isPending={isConfirmPending}
-        onConfirm={handleReport}
         onCancel={() => setConfirmAction(null)}
       />
 

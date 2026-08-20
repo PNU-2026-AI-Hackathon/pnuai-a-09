@@ -123,24 +123,88 @@ async function requestAI<T>(
   return (await response.json()) as T;
 }
 
+export type CrisisResource = {
+  label: string;
+  /** 전화번호. 있으면 시트에서 바로 걸 수 있는 버튼이 된다 */
+  phone: string | null;
+  url: string | null;
+};
+
+export type WhaleMessage = {
+  message: string;
+  /** 자해·자살 같은 위험 신호가 잡힌 글인지 (safety.is_risky) */
+  isRisky: boolean;
+  /** 위험 종류. 서버가 주는 문자열을 그대로 둔다 */
+  riskType: string | null;
+  /** 서버가 함께 내려준 상담 기관. 없으면 앱이 가진 기본 번호를 쓴다 */
+  resources: CrisisResource[];
+};
+
+/**
+ * 서버 응답의 safety 블록.
+ *
+ * level·categories·category_scores·action 은 지금 화면에서 쓰지 않아 받지 않는다.
+ * 필요해지면 여기에 추가하면 된다.
+ */
+type SafetyPayload = {
+  is_risky?: boolean;
+  flagged?: boolean;
+  risk_type?: string;
+  resources?: Record<string, unknown>[];
+};
+
+/** resources 의 키 이름이 기관마다 달라서, 쓸 만한 후보를 순서대로 찾는다. */
+function pickString(source: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function readResources(safety: SafetyPayload | undefined): CrisisResource[] {
+  if (!Array.isArray(safety?.resources)) {
+    return [];
+  }
+
+  return safety.resources
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map((item) => ({
+      label: pickString(item, ["name", "title", "label"]) ?? "상담 전화",
+      phone: pickString(item, ["phone", "tel", "number", "contact"]),
+      url: pickString(item, ["url", "link", "href"]),
+    }))
+    // 연락할 방법이 없는 항목은 안내할 이유가 없다.
+    .filter((resource) => resource.phone || resource.url);
+}
+
 /** 일기 원문으로 고래 한마디를 받아온다. 서버는 DB 에 쓰지 않는다. */
 export async function fetchWhaleMessage({
   diary,
   draftId,
   retryCount = 0,
-}: WhaleMessageParams): Promise<string> {
+}: WhaleMessageParams): Promise<WhaleMessage> {
   const trimmed = diary.trim();
   if (!trimmed) {
     throw new Error("일기를 먼저 작성해 주세요.");
   }
 
-  const data = await requestAI<{ whale: string }>("/ai/whale-message", {
+  const data = await requestAI<{ whale: string; safety?: SafetyPayload }>("/ai/whale-message", {
     diary: trimmed,
     draft_id: draftId,
     retry_count: retryCount,
   });
 
-  return data.whale;
+  return {
+    message: data.whale,
+    // flagged 는 모더레이션이 걸렸다는 뜻이고, 안내를 띄울지는 is_risky 로 판단한다.
+    isRisky: data.safety?.is_risky === true,
+    riskType: data.safety?.risk_type ?? null,
+    resources: readResources(data.safety),
+  };
 }
 
 /**

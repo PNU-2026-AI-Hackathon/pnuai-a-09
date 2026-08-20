@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AIBottomSheet } from '@/components/ai-bottom-sheet';
+import { AIBottomSheet, type FeedbackPayload } from '@/components/ai-bottom-sheet';
 import { CustomImagePicker } from '@/components/custom-image-picker';
 import AIIcon from '@/components/icons/ai-icon';
 import UnorderedListIcon from '@/components/icons/unordered-list-icon';
@@ -31,7 +31,14 @@ import {
   primary,
   white,
 } from '@/constants/theme';
-import { createDraftId, fetchWhaleMessage, finalizeWhaleMemory, saveWhaleMemory } from '@/src/services/ai';
+import {
+  createDraftId,
+  fetchWhaleMessage,
+  finalizeWhaleMemory,
+  saveWhaleMemory,
+  type CrisisResource,
+} from '@/src/services/ai';
+import { submitAIFeedback } from '@/src/services/ai-feedback';
 import { createPost, fetchPostForEdit, updatePost, type EditablePost } from '@/src/services/posts';
 import type { PostVisibility } from '@/src/types/api/feed-post';
 
@@ -68,6 +75,9 @@ export default function WritePage() {
   const [whaleMessage, setWhaleMessage] = useState('');
   const [isWhaleLoading, setIsWhaleLoading] = useState(false);
   const [whaleError, setWhaleError] = useState<string | null>(null);
+  // 서버(safety 블록)가 위험 신호를 붙여 보낸 한마디인지. 시트에 상담 전화 안내를 띄운다.
+  const [isWhaleRisky, setIsWhaleRisky] = useState(false);
+  const [crisisResources, setCrisisResources] = useState<CrisisResource[]>([]);
   const [retryCount, setRetryCount] = useState(0);
 
   // 이 draft 안에서 지금까지 받은 한마디 전부(성공한 것만). 마지막 항목이 곧
@@ -87,6 +97,8 @@ export default function WritePage() {
     appliedDraftIdRef.current = null;
     setWhaleMessage('');
     setWhaleError(null);
+    setIsWhaleRisky(false);
+    setCrisisResources([]);
     setRetryCount(0);
   }, []);
 
@@ -144,8 +156,10 @@ export default function WritePage() {
         draftId: draft.draftId,
         retryCount: nextRetryCount,
       });
-      setWhaleMessage(whale);
-      suggestionHistoryRef.current.push({ whaleMessage: whale, retryCount: nextRetryCount });
+      setWhaleMessage(whale.message);
+      setIsWhaleRisky(whale.isRisky);
+      setCrisisResources(whale.resources);
+      suggestionHistoryRef.current.push({ whaleMessage: whale.message, retryCount: nextRetryCount });
     } catch (error) {
       setWhaleError(error instanceof Error ? error.message : '한마디를 받아오지 못했어요.');
     } finally {
@@ -164,6 +178,8 @@ export default function WritePage() {
     draftRef.current = { original: text, draftId: createDraftId() };
     suggestionHistoryRef.current = [];
     setWhaleMessage('');
+    setIsWhaleRisky(false);
+    setCrisisResources([]);
     setRetryCount(0);
     setIsSheetVisible(true);
     void requestWhaleMessage(0);
@@ -245,6 +261,28 @@ export default function WritePage() {
       }).catch((error) => {
         console.warn('[ai] 장기기억 저장 실패', error);
       });
+    }
+  };
+
+  /**
+   * 고래 한마디 평가 제출.
+   *
+   * 시트는 제출을 기다리지 않고 바로 메인 화면으로 돌아간다. 그래서 결과를 알리지
+   * 않으면 보내진 건지 알 수 없다 — 성공·실패 모두 알린다.
+   */
+  const handleFeedbackSubmit = async (feedback: FeedbackPayload) => {
+    try {
+      await submitAIFeedback({
+        type: feedback.type,
+        reasons: feedback.reasons,
+        comment: feedback.comment,
+        whaleMessage,
+        draftId: draftRef.current?.draftId ?? null,
+        retryCount,
+      });
+      Alert.alert('평가를 보냈어요.', '더 좋은 한마디를 만드는 데 쓸게요. 고맙습니다!');
+    } catch (error) {
+      Alert.alert(error instanceof Error ? error.message : '평가를 보내지 못했습니다.');
     }
   };
 
@@ -388,9 +426,12 @@ export default function WritePage() {
         aiResponse={whaleMessage}
         isLoading={isWhaleLoading}
         errorMessage={whaleError}
+        isRisky={isWhaleRisky}
+        crisisResources={crisisResources}
         onClose={() => setIsSheetVisible(false)}
         onRefresh={handleRefresh}
         onApply={handleApply}
+        onFeedbackSubmit={handleFeedbackSubmit}
       />
     </SafeAreaView>
   );

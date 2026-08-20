@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { darkGray, FontFamily, gray, lightGray, primary, red, white } from '@/constants/theme';
@@ -150,6 +150,8 @@ export default function NotificationsPage() {
   const [friendRequests, setFriendRequests] = useState<AppUser[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [pendingRequestIds, setPendingRequestIds] = useState<Record<string, boolean>>({});
+  // 처음 받아오는 동안 '알림이 없어요'가 깜빡이지 않게 로딩을 구분한다.
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
@@ -180,6 +182,11 @@ export default function NotificationsPage() {
       })
       .catch((error) => {
         console.warn('[notifications] Failed to load notifications', error);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       });
 
     return () => {
@@ -193,6 +200,8 @@ export default function NotificationsPage() {
   const handleNotificationPress = (postId: string) => {
     router.navigate({ pathname: '/(tabs)/home', params: { postId } });
   };
+
+  const isEmpty = friendRequests.length === 0 && notifications.length === 0;
 
   const handleRespond = async (requester: AppUser, accept: boolean) => {
     if (!currentUserId || pendingRequestIds[requester.id]) {
@@ -233,7 +242,26 @@ export default function NotificationsPage() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={[styles.content, isEmpty && styles.emptyContent]}
+        showsVerticalScrollIndicator={false}>
+        {/* 친구 요청도 알림도 없을 때. 로딩 중에는 문구 대신 스피너를 둔다 */}
+        {isEmpty ? (
+          <View style={styles.emptyBox}>
+            {isLoading ? (
+              <ActivityIndicator color={gray} />
+            ) : (
+              <>
+                <Text style={styles.emptyTitle}>아직 알림이 없어요</Text>
+                <Text style={styles.emptyText}>
+                  친구들이 남긴 좋아요와 댓글이 여기에 모여요.
+                </Text>
+              </>
+            )}
+          </View>
+        ) : null}
+
         {friendRequests.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>친구 요청</Text>
@@ -311,6 +339,30 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 96,
+  },
+  // 빈 화면일 때만 세로 가운데로. 목록이 있을 때 쓰면 짧은 목록이 가운데로 몰린다.
+  emptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  emptyBox: {
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingBottom: 40,
+  },
+  emptyTitle: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardSemiBold,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  emptyText: {
+    marginTop: 6,
+    textAlign: 'center',
+    color: gray,
+    fontFamily: FontFamily.pretendardRegular,
+    fontSize: 13,
+    lineHeight: 18,
   },
   section: {
     paddingTop: 16,

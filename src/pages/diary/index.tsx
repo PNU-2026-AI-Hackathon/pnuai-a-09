@@ -19,16 +19,28 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
-import { background, darkGray, FontFamily, FontSize, gray, lightGray, primary, white } from '@/constants/theme';
+import { ConfirmModal } from '@/components/confirm-modal';
+import { background, darkGray, FontFamily, FontSize, gray, lightGray, primary, red, white } from '@/constants/theme';
 import {
   createDiaryCategory,
+  deleteDiaryCategory,
   fetchDiaryArchiveByUserId,
+  updateDiaryCategory,
   type DiaryCategory,
   type DiaryEntry,
 } from '@/src/services/diary';
 import { fetchCurrentUser } from '@/src/services/users';
 
 const MAX_CATEGORY_NAME_LENGTH = 20;
+
+/** 폴더에 걸린 대표 이미지의 uri. 수정 시트에서 기존 썸네일을 보여주는 데 쓴다. */
+function getCategoryImageUri(image: DiaryCategory['image']): string | null {
+  if (image && typeof image === 'object' && 'uri' in image && typeof image.uri === 'string') {
+    return image.uri;
+  }
+
+  return null;
+}
 
 const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const MONTH_LABELS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -111,6 +123,13 @@ export default function DiaryPage() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryImage, setNewCategoryImage] = useState<string | null>(null);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  /** 수정 중인 카테고리. null 이면 시트는 '새 카테고리'로 동작한다. */
+  const [editingCategory, setEditingCategory] = useState<DiaryCategory | null>(null);
+  // 수정 시트는 기존 썸네일을 미리 보여준다. 새로 고르지 않았으면 다시 올리지 않는다.
+  const [isCategoryImageChanged, setIsCategoryImageChanged] = useState(false);
+  const [menuCategory, setMenuCategory] = useState<DiaryCategory | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DiaryCategory | null>(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
   const weeks = useMemo(() => getCalendarWeeks(selectedYear, selectedMonth), [selectedMonth, selectedYear]);
   const entriesByDay = useMemo(() => new Map(diaryEntries.map((entry) => [entry.day, entry])), [diaryEntries]);
@@ -154,6 +173,25 @@ export default function DiaryPage() {
     setIsCategoryModalOpen(false);
     setNewCategoryName('');
     setNewCategoryImage(null);
+    setEditingCategory(null);
+    setIsCategoryImageChanged(false);
+  };
+
+  const openCreateCategory = () => {
+    setEditingCategory(null);
+    setNewCategoryName('');
+    setNewCategoryImage(null);
+    setIsCategoryImageChanged(false);
+    setIsCategoryModalOpen(true);
+  };
+
+  const openEditCategory = (category: DiaryCategory) => {
+    setMenuCategory(null);
+    setEditingCategory(category);
+    setNewCategoryName(category.title);
+    setNewCategoryImage(getCategoryImageUri(category.image));
+    setIsCategoryImageChanged(false);
+    setIsCategoryModalOpen(true);
   };
 
   const handlePickCategoryImage = async () => {
@@ -179,9 +217,10 @@ export default function DiaryPage() {
     }
 
     setNewCategoryImage(result.assets[0].uri);
+    setIsCategoryImageChanged(true);
   };
 
-  const handleCreateCategory = async () => {
+  const handleSubmitCategory = async () => {
     const title = newCategoryName.trim();
     if (!title || !userId || isCreatingCategory) {
       return;
@@ -190,14 +229,44 @@ export default function DiaryPage() {
     setIsCreatingCategory(true);
 
     try {
-      await createDiaryCategory(userId, title, newCategoryImage);
+      if (editingCategory) {
+        await updateDiaryCategory(
+          userId,
+          editingCategory.title,
+          title,
+          // 사진을 새로 고르지 않았으면 기존 썸네일을 그대로 둔다.
+          isCategoryImageChanged ? newCategoryImage : null,
+        );
+      } else {
+        await createDiaryCategory(userId, title, newCategoryImage);
+      }
+
       closeCategoryModal();
       setReloadKey((key) => key + 1);
     } catch (error) {
-      const message = error instanceof Error ? error.message : '카테고리를 추가하지 못했어요.';
-      Alert.alert('등록 실패', message);
+      const fallback = editingCategory ? '카테고리를 수정하지 못했어요.' : '카테고리를 추가하지 못했어요.';
+      Alert.alert(editingCategory ? '수정 실패' : '등록 실패', error instanceof Error ? error.message : fallback);
     } finally {
       setIsCreatingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!deleteTarget || isDeletingCategory) {
+      return;
+    }
+
+    setIsDeletingCategory(true);
+
+    try {
+      await deleteDiaryCategory(deleteTarget.title);
+      setDeleteTarget(null);
+      setReloadKey((key) => key + 1);
+    } catch (error) {
+      setDeleteTarget(null);
+      Alert.alert('삭제 실패', error instanceof Error ? error.message : '카테고리를 삭제하지 못했어요.');
+    } finally {
+      setIsDeletingCategory(false);
     }
   };
 
@@ -239,11 +308,23 @@ export default function DiaryPage() {
                 return (
                   <View key={`${day ?? 'empty'}-${weekIndex}-${dayIndex}`} style={styles.dayCell}>
                     {day ? (
-                      <View
-                        style={[
+                      // 글을 쓴 날만 눌린다. 누르면 피드에서 그 글로 데려간다.
+                      <Pressable
+                        accessibilityRole={entry ? 'button' : undefined}
+                        accessibilityLabel={entry ? `${selectedMonth + 1}월 ${day}일 기록 보기` : undefined}
+                        disabled={!entry}
+                        onPress={() =>
+                          entry &&
+                          router.navigate({
+                            pathname: '/(tabs)/home',
+                            params: { postId: entry.postId },
+                          })
+                        }
+                        style={({ pressed }) => [
                           styles.dayContent,
                           entry && !entry.hasPhoto ? styles.textDiaryCell : undefined,
                           needsPhotoBackdrop ? styles.photoFallbackCell : undefined,
+                          pressed && entry ? styles.pressed : undefined,
                         ]}>
                         {photoSource ? (
                           <Image
@@ -258,7 +339,7 @@ export default function DiaryPage() {
                           />
                         ) : null}
                         <Text style={[styles.dayText, entry ? styles.activeDayText : undefined]}>{day}</Text>
-                      </View>
+                      </Pressable>
                     ) : null}
                   </View>
                 );
@@ -274,7 +355,7 @@ export default function DiaryPage() {
               accessibilityRole="button"
               accessibilityLabel="새 카테고리 추가"
               hitSlop={10}
-              onPress={() => setIsCategoryModalOpen(true)}
+              onPress={openCreateCategory}
               style={({ pressed }) => [styles.addCategoryButton, pressed && styles.pressed]}>
               <Ionicons name="add" size={24} color={darkGray} />
             </Pressable>
@@ -300,6 +381,9 @@ export default function DiaryPage() {
                       },
                     })
                   }
+                  // '전체'는 실제 폴더가 아니라 모아 보기라서 고치거나 지울 수 없다.
+                  onLongPress={category.id === 'all' ? undefined : () => setMenuCategory(category)}
+                  delayLongPress={300}
                   style={styles.categoryItem}>
                   <View style={styles.folderStack}>
                     <View style={styles.folderBack} />
@@ -397,7 +481,7 @@ export default function DiaryPage() {
                   style={styles.sheetBackButton}>
                   <Ionicons name="arrow-back" size={24} color={darkGray} />
                 </Pressable>
-                <Text style={styles.sheetTitle}>새 카테고리</Text>
+                <Text style={styles.sheetTitle}>{editingCategory ? '카테고리 수정' : '새 카테고리'}</Text>
                 <View style={styles.sheetHeaderSpacer} />
               </View>
               <View style={styles.sheetDivider} />
@@ -435,15 +519,15 @@ export default function DiaryPage() {
                   returnKeyType="done"
                   autoFocus
                   onSubmitEditing={() => {
-                    void handleCreateCategory();
+                    void handleSubmitCategory();
                   }}
                 />
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="등록하기"
+                  accessibilityLabel={editingCategory ? '수정하기' : '등록하기'}
                   disabled={!newCategoryName.trim() || isCreatingCategory}
                   onPress={() => {
-                    void handleCreateCategory();
+                    void handleSubmitCategory();
                   }}
                   style={({ pressed }) => [
                     styles.submitButton,
@@ -453,7 +537,7 @@ export default function DiaryPage() {
                   {isCreatingCategory ? (
                     <ActivityIndicator color={white} />
                   ) : (
-                    <Text style={styles.submitButtonText}>등록하기</Text>
+                    <Text style={styles.submitButtonText}>{editingCategory ? '수정하기' : '등록하기'}</Text>
                   )}
                 </Pressable>
               </View>
@@ -461,11 +545,90 @@ export default function DiaryPage() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* 폴더를 길게 누르면 뜨는 수정·삭제 메뉴 */}
+      <Modal
+        visible={menuCategory !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuCategory(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setMenuCategory(null)}>
+          <Pressable style={styles.categoryMenuCard}>
+            <Text style={styles.categoryMenuTitle} numberOfLines={1}>
+              {menuCategory?.title}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="카테고리 수정"
+              onPress={() => menuCategory && openEditCategory(menuCategory)}
+              style={({ pressed }) => [styles.categoryMenuItem, pressed && styles.pressed]}>
+              <Text style={styles.categoryMenuText}>수정</Text>
+            </Pressable>
+            <View style={styles.categoryMenuDivider} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="카테고리 삭제"
+              onPress={() => {
+                setDeleteTarget(menuCategory);
+                setMenuCategory(null);
+              }}
+              style={({ pressed }) => [styles.categoryMenuItem, pressed && styles.pressed]}>
+              <Text style={[styles.categoryMenuText, styles.categoryMenuTextDanger]}>삭제</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <ConfirmModal
+        visible={deleteTarget !== null}
+        title={`'${deleteTarget?.title ?? ''}' 카테고리를 삭제할까요?`}
+        message="폴더만 없어지고, 안에 있던 글은 '전체'에 그대로 남아요."
+        confirmLabel="삭제"
+        destructive
+        isPending={isDeletingCategory}
+        onConfirm={() => {
+          void handleDeleteCategory();
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  categoryMenuCard: {
+    width: 220,
+    borderRadius: 12,
+    backgroundColor: white,
+    paddingVertical: 6,
+    overflow: 'hidden',
+  },
+  categoryMenuTitle: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
+    color: gray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  categoryMenuItem: {
+    height: 46,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  categoryMenuText: {
+    color: darkGray,
+    fontFamily: FontFamily.pretendardMedium,
+    fontSize: 15,
+  },
+  categoryMenuTextDanger: {
+    color: red,
+  },
+  categoryMenuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: lightGray,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: background,

@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ConfirmModal } from "@/components/confirm-modal";
+import { InquiryBottomSheet } from "@/components/inquiry-bottom-sheet";
 import { SettingIcon, type SettingIconName } from "@/components/setting-icons";
 import {
   background,
@@ -25,9 +26,12 @@ import {
   red,
   white,
 } from "@/constants/theme";
+import { fetchAccountEmail, submitInquiry } from "@/src/services/inquiries";
 import { signOutUser } from "@/src/services/onboarding";
 import type { TermType } from "@/src/services/terms";
 import { fetchCurrentUser, type AppUser } from "@/src/services/users";
+
+const cryingWhaleImage = require("../../../assets/icons/crying_whale.png");
 
 type SettingRow = {
   icon: SettingIconName;
@@ -60,14 +64,19 @@ const APP_SETTING_ROWS: SettingRow[] = [
   },
 ];
 
-const SUPPORT_ROWS: SettingRow[] = [
+// 문의하기는 화면 이동이 아니라 하단 시트를 열어서, 핸들러를 받아 만든다.
+const buildSupportRows = (onInquiry: () => void): SettingRow[] => [
   {
     icon: "broadcast",
     label: "공지사항",
     go: () => router.push("/(tabs)/profile/settings/notices"),
   },
-  { icon: "ask", label: "문의하기" },
-  { icon: "siren", label: "신고내역" },
+  { icon: "ask", label: "문의하기", go: onInquiry },
+  {
+    icon: "siren",
+    label: "신고내역",
+    go: () => router.push("/(tabs)/profile/settings/reports"),
+  },
 ];
 
 const LEGAL_ROWS: SettingRow[] = [
@@ -81,11 +90,6 @@ const LEGAL_ROWS: SettingRow[] = [
     label: "개인정보처리방침",
     go: () => goToTerm("privacy", "개인정보처리방침"),
   },
-  {
-    icon: "license",
-    label: "오픈소스 라이선스",
-    go: () => goToTerm("open_source", "오픈소스 라이선스"),
-  },
 ];
 
 const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
@@ -93,8 +97,15 @@ const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 export default function SettingsPage() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  /** 열려 있는 확인 모달. 둘이 동시에 뜰 일은 없어서 한 상태로 둔다 */
+  const [confirmAction, setConfirmAction] = useState<
+    "logout" | "withdraw" | null
+  >(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isInquiryOpen, setIsInquiryOpen] = useState(false);
+  const [isSendingInquiry, setIsSendingInquiry] = useState(false);
+  /** 문의 폼의 이메일 기본값. 소셜 로그인이면 계정 이메일이 없을 수 있다. */
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -119,9 +130,50 @@ export default function SettingsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchAccountEmail().then((email) => {
+      if (isMounted) {
+        setAccountEmail(email);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // 아직 화면이 없는 항목. 디자인이 나오는 대로 하나씩 연결한다.
   const showComingSoon = (label: string) => {
     Alert.alert(label, "준비 중이에요.");
+  };
+
+  const handleInquiry = async (values: {
+    content: string;
+    email: string | null;
+  }) => {
+    if (isSendingInquiry) {
+      return;
+    }
+
+    setIsSendingInquiry(true);
+
+    try {
+      await submitInquiry({ content: values.content, replyEmail: values.email });
+      setIsInquiryOpen(false);
+      Alert.alert(
+        "문의를 보냈어요.",
+        "확인 후 남겨 주신 이메일로 답변드릴게요.",
+      );
+    } catch (error) {
+      // 글자 수·발송 제한 안내는 시트를 열어 둔 채로 보여 줘야 고쳐 쓸 수 있다.
+      Alert.alert(
+        error instanceof Error ? error.message : "문의를 보내지 못했습니다.",
+      );
+    } finally {
+      setIsSendingInquiry(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -133,11 +185,11 @@ export default function SettingsPage() {
 
     try {
       await signOutUser();
-      setIsLogoutConfirmOpen(false);
+      setConfirmAction(null);
       router.replace("/");
     } catch (error) {
       console.warn("[settings] Failed to sign out", error);
-      setIsLogoutConfirmOpen(false);
+      setConfirmAction(null);
       Alert.alert("로그아웃하지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setIsSigningOut(false);
@@ -209,7 +261,7 @@ export default function SettingsPage() {
         />
         <SettingSection
           title="고객지원"
-          rows={SUPPORT_ROWS}
+          rows={buildSupportRows(() => setIsInquiryOpen(true))}
           onUnavailable={showComingSoon}
         />
         <SettingSection
@@ -232,7 +284,7 @@ export default function SettingsPage() {
             accessibilityRole="button"
             accessibilityLabel="로그아웃"
             disabled={isSigningOut}
-            onPress={() => setIsLogoutConfirmOpen(true)}
+            onPress={() => setConfirmAction("logout")}
             style={({ pressed }) => [
               styles.plainRow,
               pressed && styles.pressed,
@@ -243,7 +295,7 @@ export default function SettingsPage() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="회원탈퇴"
-            onPress={() => showComingSoon("회원탈퇴")}
+            onPress={() => setConfirmAction("withdraw")}
             style={({ pressed }) => [
               styles.plainRow,
               pressed && styles.pressed,
@@ -254,17 +306,43 @@ export default function SettingsPage() {
         </View>
       </ScrollView>
 
+      <InquiryBottomSheet
+        visible={isInquiryOpen}
+        defaultEmail={accountEmail}
+        isPending={isSendingInquiry}
+        onSubmit={(values) => {
+          void handleInquiry(values);
+        }}
+        onClose={() => setIsInquiryOpen(false)}
+      />
+
       <ConfirmModal
-        visible={isLogoutConfirmOpen}
-        title="로그아웃할까요?"
+        visible={confirmAction === "logout"}
+        title="정말 로그아웃하시겠습니까?"
         message="다시 로그인하면 그대로 이어서 쓸 수 있어요."
         confirmLabel="로그아웃"
+        image={cryingWhaleImage}
         destructive
         isPending={isSigningOut}
         onConfirm={() => {
           void handleLogout();
         }}
-        onCancel={() => setIsLogoutConfirmOpen(false)}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      {/* 탈퇴 처리 API가 아직 없어서 확인까지만 받고 안내를 띄운다 */}
+      <ConfirmModal
+        visible={confirmAction === "withdraw"}
+        title="정말 탈퇴하시겠습니까?"
+        message="탈퇴하면 작성한 글과 친구 관계가 모두 사라지고 되돌릴 수 없어요."
+        confirmLabel="탈퇴"
+        image={cryingWhaleImage}
+        destructive
+        onConfirm={() => {
+          setConfirmAction(null);
+          showComingSoon("회원탈퇴");
+        }}
+        onCancel={() => setConfirmAction(null)}
       />
     </SafeAreaView>
   );

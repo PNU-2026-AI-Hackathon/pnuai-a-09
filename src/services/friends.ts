@@ -16,6 +16,7 @@ type ProfileRow = {
   description: string | null;
   installed_at: string;
   intimacy_level: number;
+  whale_id: number | null;
 };
 
 export async function fetchAcceptedFriendIds(userId: string): Promise<string[]> {
@@ -46,7 +47,7 @@ export async function fetchAcceptedFriendsForUser(userId: string): Promise<AppUs
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level')
+    .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level, whale_id')
     .in('id', friendIds)
     .returns<ProfileRow[]>();
 
@@ -95,7 +96,7 @@ export async function searchUsersByKeyword(
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level')
+    .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level, whale_id')
     .neq('id', currentUserId)
     .or(`name.ilike.${pattern},tag.ilike.${pattern}`)
     .limit(20)
@@ -229,7 +230,7 @@ export async function fetchIncomingFriendRequests(userId: string): Promise<AppUs
 
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
-    .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level')
+    .select('id, name, tag, profile_image_url, description, installed_at, intimacy_level, whale_id')
     .in('id', requesterIds)
     .returns<ProfileRow[]>();
 

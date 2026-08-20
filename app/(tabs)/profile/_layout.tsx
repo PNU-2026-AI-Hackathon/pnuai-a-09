@@ -13,6 +13,7 @@ export default function ProfileLayout() {
       <Stack.Screen name="settings/blocked" />
       <Stack.Screen name="settings/privacy" />
       <Stack.Screen name="settings/notices" />
+      <Stack.Screen name="settings/reports" />
       <Stack.Screen name="settings/notice" />
       <Stack.Screen name="settings/term" />
     </Stack>

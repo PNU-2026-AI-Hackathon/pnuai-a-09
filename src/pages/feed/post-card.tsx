@@ -39,7 +39,6 @@ import {
   toggleCommentLike,
   togglePostLike,
 } from "@/src/services/posts";
-import { createReport } from "@/src/services/reports";
 
 const cryingWhaleImage = require("../../../assets/icons/crying_whale.png");
 
@@ -305,8 +304,6 @@ export function FeedPostCard({ post, onDeleted }: Props) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBlockConfirmOpen, setIsBlockConfirmOpen] = useState(false);
   const [isBlocking, setIsBlocking] = useState(false);
-  const [isReportConfirmOpen, setIsReportConfirmOpen] = useState(false);
-  const [isReporting, setIsReporting] = useState(false);
   // 목록을 들고 있는 화면이 여러 곳이라, 삭제되면 카드가 스스로 사라진다.
   const [isDeleted, setIsDeleted] = useState(false);
 
@@ -586,24 +583,17 @@ export function FeedPostCard({ post, onDeleted }: Props) {
     }
   };
 
-  const handleReport = async () => {
-    if (isReporting) {
-      return;
-    }
-
-    setIsReporting(true);
-    try {
-      await createReport({ targetType: "post", targetId: post.id });
-      setIsReportConfirmOpen(false);
-      Alert.alert("신고가 접수되었어요.");
-    } catch (error) {
-      setIsReportConfirmOpen(false);
-      Alert.alert(
-        error instanceof Error ? error.message : "신고를 접수하지 못했습니다.",
-      );
-    } finally {
-      setIsReporting(false);
-    }
+  // 사유 선택은 별도 화면에서 받는다.
+  const handleReport = () => {
+    setIsPostMenuOpen(false);
+    router.push({
+      pathname: "/report",
+      params: {
+        targetType: "post",
+        targetId: post.id,
+        targetName: post.username,
+      },
+    });
   };
 
   if (isDeleted) {
@@ -683,10 +673,7 @@ export function FeedPostCard({ post, onDeleted }: Props) {
                         <Pressable
                           accessibilityRole="button"
                           style={styles.postMenuItem}
-                          onPress={() => {
-                            setIsPostMenuOpen(false);
-                            setIsReportConfirmOpen(true);
-                          }}
+                          onPress={handleReport}
                         >
                           <Text style={styles.postMenuDelete}>신고</Text>
                         </Pressable>
@@ -917,18 +904,6 @@ export function FeedPostCard({ post, onDeleted }: Props) {
         isPending={isBlocking}
         onConfirm={handleBlock}
         onCancel={() => setIsBlockConfirmOpen(false)}
-      />
-
-      {/* 신고 사유 선택은 디자인 확정 후 추가한다. 지금은 사유 없이 접수만 한다. */}
-      <ConfirmModal
-        visible={isReportConfirmOpen}
-        title="이 게시글을 신고할까요?"
-        message="신고 내용은 운영팀이 확인해요."
-        confirmLabel="신고"
-        destructive
-        isPending={isReporting}
-        onConfirm={handleReport}
-        onCancel={() => setIsReportConfirmOpen(false)}
       />
     </View>
   );
