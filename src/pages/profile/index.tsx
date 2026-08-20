@@ -11,13 +11,13 @@ import Svg, { Path } from 'react-native-svg';
 import { PencilIcon } from '@/components/icons/pencil-icon';
 import { SmallWhaleIcon } from '@/components/icons/small-whale-icon';
 import { NotificationBellIcon } from '@/components/notification-bell-icon';
+import { DEFAULT_WHALE_ID, getIntimacyProgress, getWhaleImage } from '@/constants/whales';
 import { background, darkGray, FontFamily, gray, lightGray, primary, white } from '@/constants/theme';
 import { useUnseenNotifications } from '@/hooks/use-unseen-notifications';
 import { fetchAcceptedFriendIds } from '@/src/services/friends';
 import { signOutUser } from '@/src/services/onboarding';
 import { AppUser, fetchCurrentUser, saveCoverImage } from '@/src/services/users';
 
-const whaleImage = require('../../../assets/icons/whale1.png');
 const friendsCheerImage = require('../../../assets/icons/friends_cheer.png');
 const emptyProfile: AppUser = {
   id: '',
@@ -28,11 +28,13 @@ const emptyProfile: AppUser = {
   description: '',
   installed_at: new Date().toISOString(),
   intimacy_level: 1,
+  whale_id: DEFAULT_WHALE_ID,
   friends_count: 0,
   like_count: 0,
   post_count: 0,
 };
-const NEXT_LEVEL_DAYS = 31;
+// 다음 단계까지 며칠 남았는지는 WHALES 의 unlockDay 로 계산한다. 예전에는 여기에 31 이
+// 박혀 있어서 31일을 넘기면 '0일 남았어요'가 계속 떴다(3단계 기준은 100일이다).
 const COVER_BODY_HEIGHT = 150;
 
 function getInstalledDays(installedAt: string) {
@@ -44,7 +46,7 @@ function getInstalledDays(installedAt: string) {
 }
 
 function ProgressGauge({ days }: { days: number }) {
-  const progress = Math.min(days / NEXT_LEVEL_DAYS, 1);
+  const { daysLeft, progress } = getIntimacyProgress(days);
   const endAngle = -180 + 180 * progress;
   const radius = 50;
   const centerX = 70;
@@ -62,7 +64,11 @@ function ProgressGauge({ days }: { days: number }) {
         <Text style={styles.gaugeValue}>{days}</Text>
         <Text style={styles.gaugeUnit}>일</Text>
       </View>
-      <Text style={styles.gaugeHint}>다음 친밀도까지 {Math.max(NEXT_LEVEL_DAYS - days, 0)}일 남았어요!</Text>
+      <Text style={styles.gaugeHint}>
+        {daysLeft === null
+          ? '마지막 고래까지 만났어요!'
+          : `다음 친밀도까지 ${daysLeft}일 남았어요!`}
+      </Text>
     </View>
   );
 }
@@ -127,6 +133,8 @@ export default function ProfilePage() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isSavingCover, setIsSavingCover] = useState(false);
   const installedDays = getInstalledDays(currentUser.installed_at);
+  // 단계는 고른 고래가 아니라 함께한 날수로 정한다. 고래를 바꿔도 단계는 그대로다.
+  const intimacyLevel = getIntimacyProgress(installedDays).level;
   const coverImageUri = coverPreview ?? currentUser.cover_image_url ?? null;
 
   useFocusEffect(
@@ -315,10 +323,14 @@ export default function ProfilePage() {
             </View>
             <View style={styles.mainStreakBody}>
               <View style={styles.whaleLevel}>
-                <Image source={whaleImage} style={styles.whaleImage} contentFit="contain" />
+                <Image
+                  source={getWhaleImage(currentUser.whale_id)}
+                  style={styles.whaleImage}
+                  contentFit="contain"
+                />
                 <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 10}} >
                   <Text style={styles.levelText}>친밀도</Text>
-                  <Text style={styles.levelValue}>{currentUser.intimacy_level}단계</Text>
+                  <Text style={styles.levelValue}>{intimacyLevel}단계</Text>
                 </View>
               </View>
               <ProgressGauge days={installedDays} />
