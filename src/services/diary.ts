@@ -20,6 +20,8 @@ export type DiaryEntry = {
   day: number;
   hasPhoto?: boolean;
   image?: ImageSourcePropType;
+  /** 이 칸을 눌렀을 때 피드에서 찾아갈 글. 하루에 여러 개면 대표로 고른 하나다. */
+  postId: string;
 };
 
 export type DiaryCategory = {
@@ -137,6 +139,7 @@ export async function fetchDiaryArchiveByUserId(userId: string, year: number, mo
         day,
         hasPhoto: Boolean(image),
         image,
+        postId: post.id,
       });
     }
   });
@@ -314,6 +317,49 @@ export async function createDiaryCategory(
       throw new Error('이미 있는 카테고리예요.');
     }
     throw new Error(error.message ?? '카테고리 추가에 실패했습니다.');
+  }
+}
+
+/**
+ * 카테고리 이름·썸네일 수정.
+ *
+ * 이름은 diary_categories 행과 posts.category 두 곳에 있어서 한 트랜잭션으로 묶어야
+ * 한다(update_diary_category RPC). localImageUri 를 주면 새로 올린 사진으로 바꾸고,
+ * 주지 않으면 기존 썸네일을 그대로 둔다.
+ */
+export async function updateDiaryCategory(
+  userId: string,
+  title: string,
+  newTitle: string,
+  localImageUri?: string | null,
+): Promise<void> {
+  const trimmed = newTitle.trim();
+
+  if (!trimmed) {
+    throw new Error('카테고리명을 입력해 주세요.');
+  }
+
+  const imageUrl = localImageUri ? await uploadDiaryCategoryImage(userId, localImageUri) : null;
+
+  const { error } = await supabase.rpc('update_diary_category', {
+    p_title: title,
+    p_new_title: trimmed,
+    p_image_url: imageUrl,
+  });
+
+  if (error) {
+    console.warn('[diary] Failed to update category', error);
+    throw new Error(error.message || '카테고리를 수정하지 못했어요.');
+  }
+}
+
+/** 카테고리 삭제. 안에 있던 글은 지우지 않고 '전체'로 남는다. */
+export async function deleteDiaryCategory(title: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_diary_category', { p_title: title });
+
+  if (error) {
+    console.warn('[diary] Failed to delete category', error);
+    throw new Error(error.message || '카테고리를 삭제하지 못했어요.');
   }
 }
 
