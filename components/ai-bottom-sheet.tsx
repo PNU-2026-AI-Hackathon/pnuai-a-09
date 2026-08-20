@@ -269,10 +269,6 @@ export function AIBottomSheet({
             styles.sheet,
             { paddingBottom: insets.bottom + 20, transform: [{ translateY: sheetTranslateY }] },
           ]}>
-          {/* 시트 안쪽 빈 곳을 누르면 키보드를 내린다. accessible={false} 는 이 래퍼가
-              스크린리더에서 하나의 버튼처럼 읽히지 않게 하려는 것이다. */}
-          <Pressable style={StyleSheet.absoluteFill} onPress={Keyboard.dismiss} accessible={false} />
-
           <Animated.View
             needsOffscreenAlphaCompositing
             renderToHardwareTextureAndroid
@@ -280,6 +276,18 @@ export function AIBottomSheet({
               styles.sheetContent,
               { opacity: contentOpacity, transform: [{ translateX: contentTranslateX }] },
             ]}>
+            {/*
+              시트 안 아무 데나 누르면 키보드를 내린다.
+
+              예전에는 콘텐츠 뒤에 absoluteFill Pressable 을 깔아 뒀는데, 그러면 글자나
+              여백 위를 눌렀을 때는 콘텐츠가 먼저 터치를 받아 키보드가 그대로 남았다.
+              콘텐츠를 통째로 감싸면 버튼·입력창처럼 스스로 터치를 처리하는 자식은
+              그대로 동작하고, 나머지 영역은 전부 이쪽으로 떨어진다.
+
+              accessible={false} 는 이 래퍼가 스크린리더에서 하나의 버튼처럼 읽히지
+              않게 하려는 것이다.
+            */}
+            <Pressable style={styles.dismissArea} onPress={Keyboard.dismiss} accessible={false}>
             {feedbackScreen === 'main' ? (
               <>
                 {/* Header: 뒤로가기 + "고래에게 물어보기" */}
@@ -478,6 +486,7 @@ export function AIBottomSheet({
                 </View>
               </>
             )}
+            </Pressable>
           </Animated.View>
         </Animated.View>
       </View>
@@ -547,6 +556,12 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   sheetContent: {
+    flex: 1,
+    gap: 15,
+  },
+  // 콘텐츠를 감싸는 키보드 내리기용 래퍼. 원래 sheetContent 가 하던 레이아웃을
+  // 그대로 이어받아야 간격이 틀어지지 않는다.
+  dismissArea: {
     flex: 1,
     gap: 15,
   },
